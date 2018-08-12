@@ -1,2 +1,2 @@
-# nopyseq
-Not Only a Python Sequencer
+# yapyseq
+Yet Another Python Sequencer
