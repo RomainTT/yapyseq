@@ -10,4 +10,4 @@ setup(name='yapyseq',
       author_email='romain@taprest.fr',
       url='',
       packages=['yapyseq']
-     )
+      )

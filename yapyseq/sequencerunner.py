@@ -15,7 +15,7 @@ class SequenceRunner(object):
     of the sequence in the right order, executing each function of each node
     it passes through.
 
-    This object uses a `FunctionGrabber` to access functions that have to be run,
+    This object uses a `FunctionGrabber` to access functions that have to be run
     and a `SequenceAnalyzer` to know in which order the nodes must be executed.
 
     `SequenceRunner` has an API to:
