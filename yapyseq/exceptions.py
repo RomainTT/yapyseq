@@ -2,5 +2,13 @@
 # coding: utf-8
 
 
-class FunctionUniquenessError(Exception):
+class FunctionUniquenessError(ImportError):
+    pass
+
+
+class FunctionExistenceError(ImportError):
+    pass
+
+
+class UnknownFunction(FunctionExistenceError):
     pass
