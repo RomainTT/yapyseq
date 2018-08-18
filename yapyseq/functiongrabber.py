@@ -28,6 +28,10 @@ class FunctionGrabber(object):
         None
     """
 
+    # --------------------------------------------------------------------------
+    # Private methods
+    # --------------------------------------------------------------------------
+
     def __init__(self):
         self._imported_functions = dict()
 
@@ -73,6 +77,10 @@ class FunctionGrabber(object):
                         # Function has been found, append it to result
                         found_func.append(func)
         return found_func
+
+    # --------------------------------------------------------------------------
+    # Public methods
+    # --------------------------------------------------------------------------
 
     def import_functions(self, directory: str, func_set: set):
         """Search for functions in a directory and import them.
