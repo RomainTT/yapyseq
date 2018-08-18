@@ -62,3 +62,4 @@ must be aware of this danger.
 
 ### Global variables of a sequence
 
+TODO: explain how it works.

@@ -11,6 +11,7 @@ import os
 import yaml
 import yamale
 from collections import Counter
+from typing import Union
 from .exceptions import SequenceFileError
 
 # Default path to the file used as a schema to check sequences
@@ -79,8 +80,10 @@ class SequenceAnalyzer(object):
 
         # Collect data into private attributes
         self._seq_name = loaded['sequence']['info']['name']
-        self._seq_nodes = loaded['sequence']['nodes']
-        self._seq_trans = loaded['sequence']['transitions']
+        self._seq_nodes = dict((n['id'], n)
+                               for n in loaded['sequence']['nodes'])
+        self._seq_trans = dict((t['id'], t)
+                               for t in loaded['sequence']['transitions'])
 
     # --------------------------------------------------------------------------
     # Public methods
@@ -139,7 +142,7 @@ class SequenceAnalyzer(object):
         Returns:
             Name of the sequence that has been used for initialization.
         """
-        pass
+        return self._seq_name
 
     def get_function_name(self, node_id: int) -> str:
         """Return the function name of a given node.
@@ -149,10 +152,13 @@ class SequenceAnalyzer(object):
 
         Returns:
             Name of the function for the given node id.
-        """
-        pass
 
-    def get_function_arguments(self, node_id: int) -> dict:
+        Raises:
+            KeyError: if the node_id does not exist in the list of nodes.
+        """
+        return self._seq_nodes[node_id]['function']
+
+    def get_function_arguments(self, node_id: int) -> Union[dict, None]:
         """Return the function arguments of a given node.
 
         Args:
@@ -161,10 +167,17 @@ class SequenceAnalyzer(object):
         Returns:
             A dictionary containing the keyword arguments of the function.
             None if arguments are omitted.
-        """
-        pass
 
-    def get_node_timeout(self, node_id: int) -> int:
+        Raises:
+            KeyError: if the node_id does not exist in the list of nodes.
+        """
+        node = self._seq_nodes[node_id]
+        try:
+            return node['arguments']
+        except KeyError:
+            return None
+
+    def get_node_timeout(self, node_id: int) -> Union[int, None]:
         """Return the node timeout of a given node.
 
         Args:
@@ -173,10 +186,17 @@ class SequenceAnalyzer(object):
         Returns:
             The timeout value, in seconds.
             None if timeout is omitted.
-        """
-        pass
 
-    def get_node_special(self, node_id: int) -> str:
+        Raises:
+            KeyError: if the node_id does not exist in the list of nodes.
+        """
+        node = self._seq_nodes[node_id]
+        try:
+            return node['timeout']
+        except KeyError:
+            return None
+
+    def get_node_special(self, node_id: int) -> Union[str, None]:
         """Return the special functionality of a given node.
 
         Args:
@@ -186,8 +206,15 @@ class SequenceAnalyzer(object):
             The name of the special functionality. Name is part of an
             enumeration that can be found in the schema file.
             None if special is omitted.
+
+        Raises:
+            KeyError: if the node_id does not exist in the list of nodes.
         """
-        pass
+        node = self._seq_nodes[node_id]
+        try:
+            return node['special']
+        except KeyError:
+            return None
 
     def get_next_node_id(self, src_node_id: int, variables: dict) -> int:
         """Return the next node to run after the given source node.
