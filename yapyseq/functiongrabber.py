@@ -48,10 +48,12 @@ class FunctionGrabber(object):
             Empty list if none.
 
         Raises:
-            ValueError: if file_path lead to no real file.
+            FileNotFoundError: if file_path lead to no real file.
+            IOError: if file cannot be read.
         """
         if not os.path.isfile(file_path):
-            raise ValueError("No file can be found at {}".format(file_path))
+            raise FileNotFoundError("No file can be found at"
+                                    " {}".format(file_path))
 
         # Initialize result as an empty list
         found_func = []
@@ -87,7 +89,7 @@ class FunctionGrabber(object):
             func_set: The set of functions to import.
 
         Raises:
-            ValueError: if the given directory does not exist.
+            NotADirectoryError: if the given directory does not exist.
             ImportError: if a problem occurred during the importation of one of
               the functions.
             FunctionUniquenessError: if a function has been found several times.
@@ -95,7 +97,7 @@ class FunctionGrabber(object):
         """
         # Check the existence of the directory to search in
         if not os.path.isdir(directory):
-            raise ValueError(
+            raise NotADirectoryError(
                 "The directory {} does not exist.".format(directory))
 
         # Create a dict to store a counter for each function in the list
