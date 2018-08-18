@@ -10,6 +10,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import os
 import yaml
 import yamale
+from collections import Counter
 from .exceptions import SequenceFileError
 
 # Default path to the file used as a schema to check sequences
@@ -102,7 +103,7 @@ class SequenceAnalyzer(object):
             IOError: if the file cannot be read.
             SequenceFileError: if format of sequence does not respect the rules.
              See `seq_schema.yaml`.
-            Same as `yamale.validate` if it raises others than ValueError
+            Same as `yamale.validate` in case it raises others than ValueError
         """
         for f in [seq_file_path, schema_path]:
             if not os.path.isfile(f):
@@ -119,7 +120,18 @@ class SequenceAnalyzer(object):
             raise SequenceFileError(("Errors found in the sequence file: {}"
                                      "\nGot following message:\n"
                                      "{}").format(seq_file_path, str(e)))
-        # TODO: check uniqueness of IDs
+        # Check uniqueness of the IDs
+        with open(seq_file_path) as f:
+            loaded = yaml.safe_load(f)
+        for item_type in ['nodes', 'transitions']:
+            item_ids = [i['id'] for i in loaded['sequence'][item_type]]
+            # Count the occurrence of each ID, and keep those that appear
+            # more than once to raise an exception.
+            non_unique_ids = [k for k, v in Counter(item_ids).items() if v > 1]
+            if non_unique_ids:
+                raise SequenceFileError(("The following ids for {} are not "
+                                         "unique : {}"
+                                         ).format(item_type, *non_unique_ids))
 
     def get_sequence_name(self) -> str:
         """Return the name of the sequence.
