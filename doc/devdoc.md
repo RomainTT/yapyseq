@@ -9,8 +9,12 @@ Core data of a sequence is saved in one .yaml file in the directory named
 ### Special nodes
 
 Some special nodes, managed by yapyseq:
+  * start
+  * stop
   * parallel_split
   * parallel_sync
+ 
+In any sequence, there is always one start and one stop.
  
 ### Sub-sequences
 

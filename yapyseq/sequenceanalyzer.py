@@ -11,7 +11,7 @@ import os
 import yaml
 import yamale
 from collections import Counter
-from typing import Union
+from typing import Union, List
 
 # ------------------------------------------------------------------------------
 # MODULE CONSTANTS
@@ -34,6 +34,13 @@ class SequenceFileError(ImportError):
 class MultipleTransitionError(RuntimeError):
     pass
 
+
+class NoTransitionError(RuntimeError):
+    pass
+
+
+class ConditionError(RuntimeError):
+    pass
 
 # ------------------------------------------------------------------------------
 # Main class
@@ -242,11 +249,11 @@ class SequenceAnalyzer(object):
         except KeyError:
             return None
 
-    def get_next_node_id(self, src_node_id: int, variables: dict) -> int:
+    def get_next_node_id(self, src_node_id: int, variables: dict) -> List[int]:
         """Return the next node to run after the given source node.
 
         Transitions will be analyzed, using the given variables to assess
-        their conditions, and winning transition will lead to the next node.
+        their conditions, and winning transition will lead to the next nodes(s).
 
         Args:
             src_node_id: the id of the node which is the source
@@ -255,13 +262,46 @@ class SequenceAnalyzer(object):
               conditions of the transitions might require.
 
         Returns:
-            The ID of the next node to run, target of the winning transition.
+              A list of IDs of every next nodes to run,
+              targets of the winning transitions.
 
         Raises:
-            MultipleTransitionsError: if no choice can be made between several
-              transitions. It means that the conditions of the transitions have
-              not anticipated the given set of variables, and allow several
-              possibilities. Transitions must be reviewed.
-            NoTransitionError: if analysis did not allow to find any valid
-              transition from the given source node.
+            KeyError: if the src_node_id is not a valid node id.
         """
+        if src_node_id not in self._seq_nodes.keys():
+            raise KeyError("Node ID {} is not a valid ID.".format(src_node_id))
+
+        # Get all the transitions that have src_node_id as source
+        candidate_ids = [t_id for t_id, t in self._seq_trans.items()
+                         if t['source'] == src_node_id]
+
+        # Allowed transitions are named 'winners'
+        winner_ids = list()
+
+        # For each candidate, check the condition
+        for cid in candidate_ids:
+            # If transition has no condition, it is immediately a winner
+            if 'condition' not in self._seq_trans[cid]:
+                winner_ids.append(cid)
+            # Else, evaluate the condition of the transition
+            else:
+                cond = self._seq_trans[cid]['condition']
+                # Evaluate the condition.
+                # None is given as globals,
+                # and variables are given as locals
+                cond_res = eval(cond, None, variables)
+                # If condition does not return a bool, raise an error
+                if type(cond_res) is not bool:
+                    raise ConditionError("The following condition does not "
+                                         "return a boolean : "
+                                         "{}".format(cond))
+                # If condition is True, then append this transition to winners
+                if cond_res is True:
+                    winner_ids.append(cid)
+
+        # Create the list of target nodes, based on the transition winners
+        target_nodes = list(set(
+            [t['target'] for t in self._seq_trans.values()
+             if t['id'] in winner_ids]))
+
+        return target_nodes
