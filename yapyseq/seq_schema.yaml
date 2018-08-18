@@ -17,7 +17,6 @@
 sequence:
 
   info:
-    id: int(required=True)  # unique ID of the sequence
     name: str(required=False)  # name of the sequence
 
   nodes: list(include('node'), required=True)

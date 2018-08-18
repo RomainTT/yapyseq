@@ -77,7 +77,6 @@ class SequenceAnalyzer(object):
             loaded = yaml.safe_load(f)
 
         # Collect data into private attributes
-        self._seq_id = loaded['sequence']['info']['id']
         self._seq_name = loaded['sequence']['info']['name']
         self._seq_nodes = loaded['sequence']['nodes']
         self._seq_trans = loaded['sequence']['transitions']
@@ -127,14 +126,6 @@ class SequenceAnalyzer(object):
 
         Returns:
             Name of the sequence that has been used for initialization.
-        """
-        pass
-
-    def get_sequence_id(self) -> int:
-        """Return the id of the sequence.
-
-        Returns:
-            ID of the sequence that has been used for initialization.
         """
         pass
 
