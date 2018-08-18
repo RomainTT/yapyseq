@@ -12,11 +12,32 @@ import yaml
 import yamale
 from collections import Counter
 from typing import Union
-from .exceptions import SequenceFileError
+
+# ------------------------------------------------------------------------------
+# MODULE CONSTANTS
+# ------------------------------------------------------------------------------
 
 # Default path to the file used as a schema to check sequences
 SEQUENCE_SCHEMA_PATH = "{}/seq_schema.yaml".format(
     os.path.dirname(os.path.realpath(__file__)))
+
+
+# ------------------------------------------------------------------------------
+# Custom exception for this module
+# ------------------------------------------------------------------------------
+
+
+class SequenceFileError(ImportError):
+    pass
+
+
+class MultipleTransitionError(RuntimeError):
+    pass
+
+
+# ------------------------------------------------------------------------------
+# Main class
+# ------------------------------------------------------------------------------
 
 
 class SequenceAnalyzer(object):
@@ -116,13 +137,14 @@ class SequenceAnalyzer(object):
         schema = yamale.make_schema(schema_path)
         data = yamale.make_data(seq_file_path)
 
-        # Validate the sequence
+        # Validate most of the sequence structure using the schema
         try:
             yamale.validate(schema, data)
         except ValueError as e:
             raise SequenceFileError(("Errors found in the sequence file: {}"
                                      "\nGot following message:\n"
                                      "{}").format(seq_file_path, str(e)))
+
         # Check uniqueness of the IDs
         with open(seq_file_path) as f:
             loaded = yaml.safe_load(f)
@@ -135,6 +157,10 @@ class SequenceAnalyzer(object):
                 raise SequenceFileError(("The following ids for {} are not "
                                          "unique : {}"
                                          ).format(item_type, *non_unique_ids))
+
+        # TODO: Check that there is no node without transitions.
+        # TODO: Check that there is one start and one stop (and one only)
+        # TODO: check compliance between transition IDs and node IDs
 
     def get_sequence_name(self) -> str:
         """Return the name of the sequence.
@@ -236,5 +262,6 @@ class SequenceAnalyzer(object):
               transitions. It means that the conditions of the transitions have
               not anticipated the given set of variables, and allow several
               possibilities. Transitions must be reviewed.
+            NoTransitionError: if analysis did not allow to find any valid
+              transition from the given source node.
         """
-        pass

@@ -13,7 +13,28 @@ import sys
 from importlib import import_module
 import mmap
 import re
-from .exceptions import *
+
+
+# ------------------------------------------------------------------------------
+# Custom exception for this module
+# ------------------------------------------------------------------------------
+
+
+class FunctionUniquenessError(ImportError):
+    pass
+
+
+class FunctionExistenceError(ImportError):
+    pass
+
+
+class UnknownFunction(ValueError):
+    pass
+
+
+# ------------------------------------------------------------------------------
+# Main class
+# ------------------------------------------------------------------------------
 
 
 class FunctionGrabber(object):
