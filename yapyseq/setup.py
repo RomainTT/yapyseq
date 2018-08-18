@@ -9,5 +9,6 @@ setup(name='yapyseq',
       author='Romain TAPREST',
       author_email='romain@taprest.fr',
       url='',
-      packages=['yapyseq']
+      packages=['yapyseq'],
+      install_requires=['pyyaml', 'yamale']
       )

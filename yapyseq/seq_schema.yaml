@@ -1,0 +1,44 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# This is a schema file for yapyseq sequences.
+
+# This file a "yamale" schema, used to validate another yaml file.
+# For more information, check the project page of the python module yamale
+# https://github.com/23andMe/Yamale
+
+
+# ------------------------------------------------------------------------------
+# First document is the schema
+# ------------------------------------------------------------------------------
+---
+sequence:
+
+  info:
+    id: int(required=True)  # unique ID of the sequence
+    name: str(required=False)  # name of the sequence
+
+  nodes: list(include('node'), required=True)
+
+  transitions: list(include('transition'), required=True)
+
+
+# ------------------------------------------------------------------------------
+# Second document contains includes for the first document
+# ------------------------------------------------------------------------------
+---
+node:
+  id: int(required=True)  # unique id of the node
+  name: str(required=False)  # name of the node
+  function: str(required=True)  # name of the function to run
+  parameters: list(map(), required=False)  # params to give to the function
+  timeout: int(required=False)  # timeout of the function, in sec
+
+transition:
+  id: int(required=True)  # unique id of the transition
+  source: int(required=True)  # unique id of the source
+  target: int(required=True)  # unique id of the target
+  condition: str(required=False)  # condition expression TODO: make a custom Validator for conditions (see doc of yamale)
+
+

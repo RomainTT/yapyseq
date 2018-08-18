@@ -12,3 +12,7 @@ class FunctionExistenceError(ImportError):
 
 class UnknownFunction(FunctionExistenceError):
     pass
+
+
+class SequenceFileError(ValueError):
+    pass
