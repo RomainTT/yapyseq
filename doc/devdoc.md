@@ -60,3 +60,5 @@ of the synchronization. The synchronization will be stuck and never be done.
 This kind of sequence is hardly detectable (but not impossible) by yapyseq. User
 must be aware of this danger.
 
+### Global variables of a sequence
+

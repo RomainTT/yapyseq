@@ -8,6 +8,7 @@
 # For more information, check the project page of the python module yamale
 # https://github.com/23andMe/Yamale
 
+# TODO: implement sub-sequences
 
 # ------------------------------------------------------------------------------
 # First document is the schema
@@ -31,8 +32,9 @@ sequence:
 node:
   id: int(required=True)  # unique id of the node
   name: str(required=False)  # name of the node
+  special: enum('start', 'stop', 'parallel_split', 'parallel_sync', required=False)  # if it is a special node.
   function: str(required=True)  # name of the function to run
-  parameters: list(map(), required=False)  # params to give to the function
+  arguments: map(required=False)  # args to give to the function
   timeout: int(required=False)  # timeout of the function, in sec
 
 transition:
