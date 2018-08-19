@@ -54,9 +54,11 @@ of the same color. It means that the `SequenceRunner` will keep history of the
 transitions that have already been performed to the synchronization node, 
 keeping also their colors.
 
+```
 O -> O ->| O -> O |-> O -> O
      ^   |-> O -> |        |
      |---------------------|
+```
 
 Sequence that won't work: a sequence with one of several parallel branches that
 escape the synchronization point by using a transition directly to the outside
@@ -64,6 +66,36 @@ of the synchronization. The synchronization will be stuck and never be done.
 This kind of sequence is hardly detectable (but not impossible) by yapyseq. User
 must be aware of this danger.
 
-### Global variables of a sequence
+### Sequence variables of a sequence
 
-TODO: explain how it works.
+A sequence can hold a certain amount of variables possesses by the 
+`SequenceRunner`. These variables can only be referenced in the sequence file.
+Node functions cannot use them directly, but some sequence variables can be 
+given to them through arguments.
+
+Sequence variables are fully managed by the a `SequenceRunner`: creation,
+transfer, deletion, update.
+
+There are different kinds of sequence variables:
+  * Built-in variables, created and managed by yapyseq. For instance, the return
+    value of nodes.
+  * User constants, defined in the sequence file and given by user when he
+    runs the sequence. For instance, a comment about the run.
+  * On-the-fly variables, created during the run of the sequence, for instance
+    to manage loop counts.
+    
+All of these variables can be used in conditions of transitions.
+
+List of built-in variables:
+  * Return values of every nodes (last run only)
+    A dedicated data structure is used to store the result of a node function.
+    It contains the exception if it raised one, and the return object.
+    Datastructure:
+        
+        result
+            result.returned
+            result.exception
+                result.exception.is_raised
+                result.exception.name
+                result.exception.args
+
