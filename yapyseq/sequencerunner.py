@@ -8,6 +8,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 from collections import namedtuple
+from .functiongrabber import FunctionGrabber
+from .sequenceanalyzer import SequenceAnalyzer
 
 # ------------------------------------------------------------------------------
 # Custom exception for this module
@@ -47,8 +49,30 @@ class SequenceRunner(object):
     # Private methods
     # --------------------------------------------------------------------------
 
-    def __init__(self):
-        pass
+    def __init__(self, func_dir: str, sequence_path: str, variables: dict):
+        """Initialize the runner with a given sequence.
+
+        Args:
+            func_dir: directory where to search the node functions for.
+            sequence_path: path to the sequence file to run.
+            variables: sequence variables given for this run.
+
+        Raises:
+
+        """
+        # Create basic objects
+        self._funcgrab = FunctionGrabber()
+        self._seqanal = SequenceAnalyzer(sequence_path)
+        self._variables = variables
+
+        # Grab all the functions
+        # This is where all the imports can fail
+        self._funcgrab.import_functions(func_dir,
+                                        self._seqanal.get_all_node_functions())
+
+        # Initialize current nodes
+        # The set of nodes that are currently processed
+        self._current_nodes = self._seqanal.get_start_node_ids()
 
     @staticmethod
     def _create_node_result(exception, returned_val) -> NodeResult:
@@ -75,9 +99,6 @@ class SequenceRunner(object):
     # --------------------------------------------------------------------------
     # Public methods
     # --------------------------------------------------------------------------
-
-    def initialize(self):
-        pass
 
     def run(self):
         pass
