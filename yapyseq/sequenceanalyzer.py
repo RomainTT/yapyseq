@@ -11,7 +11,7 @@ import os
 import yaml
 import yamale
 from collections import Counter
-from typing import Union, List
+from typing import Union, List, Set
 
 # ------------------------------------------------------------------------------
 # MODULE CONSTANTS
@@ -166,7 +166,6 @@ class SequenceAnalyzer(object):
                                          ).format(item_type, *non_unique_ids))
 
         # TODO: Check that there is no node without transitions.
-        # TODO: Check that there is one start and one stop (and one only)
         # TODO: check compliance between transition IDs and node IDs
 
     def get_sequence_name(self) -> str:
@@ -305,3 +304,41 @@ class SequenceAnalyzer(object):
              if t['id'] in winner_ids]))
 
         return target_nodes
+
+    def get_all_node_functions(self) -> Set[str]:
+        """Get the name of all the node functions in the sequence.
+
+        Only nodes without a non-null parameter "special" are considered.
+        Nodes that have a "special" functionality do not need to provide a
+        function.
+
+        Returns:
+            A set of strings being the names of all the node functions in the
+            sequence. Except for "special" nodes.
+        """
+        function_names = set()
+
+        # Browse nodes
+        for node in self._seq_nodes.values():
+            # Avoid special nodes
+            if "special" not in node:
+                function_names.add(node['function'])
+
+        return function_names
+
+    def get_start_node_ids(self) -> Set[int]:
+        """Get the IDs of all the start nodes in the sequence.
+
+        Returns:
+            A Set of integers being the IDs of the nodes with a key "special"
+            of value "start".
+        """
+        start_node_ids = set()
+
+        # Browse nodes
+        for node_id, node in self._seq_nodes.items():
+            # Check only special nodes
+            if "special" in node and node["special"] == "start":
+                start_node_ids.add(node_id)
+
+        return start_node_ids

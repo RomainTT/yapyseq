@@ -14,7 +14,7 @@ Some special nodes, managed by yapyseq:
   * parallel_split
   * parallel_sync
  
-In any sequence, there is always one start and one stop.
+In any sequence, there is at least one start and one stop.
  
 ### Sub-sequences
 
