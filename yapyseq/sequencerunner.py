@@ -8,6 +8,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 from collections import namedtuple
+from typing import Callable, Dict
+import multiprocessing as mp
+
 from .functiongrabber import FunctionGrabber
 from .sequenceanalyzer import SequenceAnalyzer
 
@@ -95,6 +98,42 @@ class SequenceRunner(object):
         res = NodeResult(except_info, returned_val)
 
         return res
+
+    @staticmethod
+    def _run_node_function(func: Callable, semaphore: mp.Semaphore, result_queue: mp.Queue,
+                           args: Dict = None, timeout: int = None) -> None:
+        """Function that can be called in a thread to run a node function and share its result.
+
+        This function must:
+          * Run the given callable that has been given, with the given arguments
+          * Manage a Timeout on this callable
+          * Provide the result of the callable through a Queue
+          * Notify the end of itself using a semaphore
+
+        Args:
+            func: The function to be run. Must be a callable.
+            semaphore: The semaphore that must be released when _run_node_function() is over.
+            result_queue: The Queue object to store the result of the node function.
+              The stored object will be of type NodeResult.
+            args: (optional) The arguments to give to the function.
+            timeout: (optional) The time limit for the function to be terminated.
+        """
+
+        # TODO: manage timeout
+
+        # Run the callable
+        try:
+            func_res = func(**args)
+        except Exception as e:
+            res = SequenceRunner._create_node_result(e, None)
+        else:
+            res = SequenceRunner._create_node_result(None, func_res)
+
+        # Provide result through the Queue
+        result_queue.put(res)
+
+        # End of _run_node_function(), release the semaphore to notify the end of one node.
+        semaphore.release()
 
     # --------------------------------------------------------------------------
     # Public methods
