@@ -7,7 +7,7 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
-from types import FunctionType
+from typing import Callable, List
 import os
 import sys
 from importlib import import_module
@@ -57,7 +57,7 @@ class FunctionGrabber(object):
         self._imported_functions = dict()
 
     @staticmethod
-    def _search_functions_in_file(file_path: str, func_set: set) -> list:
+    def _search_functions_in_file(file_path: str, func_set: set) -> List:
         """Search for a list of functions in a python file.
 
         Only first level functions are searched. It means they must be contained
@@ -187,7 +187,7 @@ class FunctionGrabber(object):
             else:
                 self._imported_functions[func_name] = imported_func
 
-    def get_function(self, func_name: str) -> FunctionType:
+    def get_function(self, func_name: str) -> Callable:
         """Get the function object of a given function name, already imported
 
         Args:
@@ -195,7 +195,7 @@ class FunctionGrabber(object):
               imported previously, using import_functions().
 
         Returns:
-            The function object of type FunctionType.
+            The function object of type Callable.
 
         Raises:
             UnknownFunction is the function has not been imported.
