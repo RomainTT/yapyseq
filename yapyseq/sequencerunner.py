@@ -55,6 +55,9 @@ class SequenceRunner(object):
         * Run the sequence
         * Pause the sequence
         * Stop the sequence
+
+    Attributes:
+        status:
     """
 
     # --------------------------------------------------------------------------
@@ -90,12 +93,12 @@ class SequenceRunner(object):
         self.status = SeqRunnerStatus.INITIALIZED
 
     @staticmethod
-    def _create_node_result(node_id, exception, returned_val) -> NodeResult:
+    def _create_node_result(node_id: int, exception: Exception, returned_obj) -> NodeResult:
         """Return an easy data structure containing result of a node.
 
         Args:
             exception: the exception object if the function raised one.
-            returned_val: the returned object if the function returned one.
+            returned_obj: the returned object if the function returned one.
 
         Returns:
             A nametuple containing all the given data in a structured form.
@@ -107,13 +110,13 @@ class SequenceRunner(object):
         else:
             except_info = ExceptInfo(False, None, None)
 
-        res = NodeResult(node_id, except_info, returned_val)
+        res = NodeResult(node_id, except_info, returned_obj)
 
         return res
 
     @staticmethod
     def _run_node_function(func: Callable, node_id: int,
-                           result_queue: mp.Queue, args: Dict = None,
+                           result_queue: mp.Queue, kwargs: Dict = None,
                            timeout: int = None) -> None:
         """Function that can be called in a thread to run a node function.
 
@@ -137,7 +140,7 @@ class SequenceRunner(object):
 
         # Run the callable
         try:
-            func_res = func(**args)
+            func_res = func(**kwargs)
         except Exception as e:
             res = SequenceRunner._create_node_result(node_id, e, None)
         else:
@@ -167,6 +170,8 @@ class SequenceRunner(object):
         # A single queue is shared by all threads to provide function node
         # results. To know when a function node is over (and therefore when to
         # start the transition), the queue is polled for a result.
+        result_queue = mp.Queue()
+
         self.status = SeqRunnerStatus.RUNNING
 
     def pause(self):
