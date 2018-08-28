@@ -10,6 +10,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from collections import namedtuple
 from typing import Callable, Dict
 import multiprocessing as mp
+from enum import Enum
 
 from .functiongrabber import FunctionGrabber
 from .sequenceanalyzer import SequenceAnalyzer
@@ -25,6 +26,14 @@ from .sequenceanalyzer import SequenceAnalyzer
 ExceptInfo = namedtuple("ExceptInfo", "is_raised name args")
 NodeResult = namedtuple("NodeResult", "exception returned")
 
+
+class SeqRunnerStatus(Enum):
+    RUNNING = 0
+    PAUSING = 1
+    PAUSED = 2
+    STOPPING = 3
+    STOPPED = 4
+    INITIALIZED = 5
 
 # ------------------------------------------------------------------------------
 # Main class
@@ -61,7 +70,7 @@ class SequenceRunner(object):
             variables: sequence variables given for this run.
 
         Raises:
-
+            Exceptions from SequenceAnalyzer and FunctionGrabber.
         """
         # Create basic objects
         self._funcgrab = FunctionGrabber()
@@ -76,6 +85,9 @@ class SequenceRunner(object):
         # Initialize current nodes
         # The set of nodes that are currently processed
         self._current_nodes = self._seqanal.get_start_node_ids()
+
+        # Update status
+        self.status = SeqRunnerStatus.INITIALIZED
 
     @staticmethod
     def _create_node_result(exception, returned_val) -> NodeResult:
@@ -132,18 +144,36 @@ class SequenceRunner(object):
         # Provide result through the Queue
         result_queue.put(res)
 
-        # End of _run_node_function(), release the semaphore to notify the end of one node.
+        # End of _run_node_function(),
+        # release the semaphore to notify the end of one node.
         semaphore.release()
 
     # --------------------------------------------------------------------------
     # Public methods
     # --------------------------------------------------------------------------
 
-    def run(self):
-        pass
+    def run(self, blocking: bool = True):
+        """Run the sequence.
+
+        Args:
+            blocking: (optional) Set to True to make the run() method as
+              blocking, meaning it won't return until there is no more nodes
+              to run. If set to False, the runner will be launched in a new
+              thread. This is useful if one wants to be able to call pause()
+              and stop() while the sequence is running.
+              TODO: implement the non blocking feature
+
+        Raises:
+
+        """
+        self.status = SeqRunnerStatus.RUNNING
 
     def pause(self):
-        pass
+        self.status = SeqRunnerStatus.PAUSING
+        # Some code...
+        self.status = SeqRunnerStatus.PAUSED
 
     def stop(self):
-        pass
+        self.status = SeqRunnerStatus.STOPPING
+        # Some code
+        self.status = SeqRunnerStatus.STOPPED
