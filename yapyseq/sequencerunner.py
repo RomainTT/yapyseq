@@ -19,6 +19,7 @@ from .sequenceanalyzer import SequenceAnalyzer
 # Custom exception for this module
 # ------------------------------------------------------------------------------
 
+
 # ------------------------------------------------------------------------------
 # Custom types for this module
 # ------------------------------------------------------------------------------
@@ -79,6 +80,9 @@ class SequenceRunner(object):
         self._funcgrab = FunctionGrabber()
         self._seqanal = SequenceAnalyzer(sequence_path)
         self._variables = variables
+
+        # See SequenceRunner.run() for the uses of the following attribute.
+        self._result_queue = mp.Queue()
 
         # Grab all the functions
         # This is where all the imports can fail
@@ -162,17 +166,50 @@ class SequenceRunner(object):
               to run. If set to False, the runner will be launched in a new
               thread. This is useful if one wants to be able to call pause()
               and stop() while the sequence is running.
-              TODO: implement the non blocking feature
 
         Raises:
 
         """
-        # A single queue is shared by all threads to provide function node
-        # results. To know when a function node is over (and therefore when to
-        # start the transition), the queue is polled for a result.
-        result_queue = mp.Queue()
+        # TODO: implement the non blocking feature
+        # This implies to manage a new call to "run" after pause has been called
 
-        self.status = SeqRunnerStatus.RUNNING
+        # If this is the first time that run() is called,
+        # current nodes are start nodes and transitions are immediately done
+        if self.status is SeqRunnerStatus.INITIALIZED:
+            for start_node_id in self._current_nodes:
+                self._current_nodes.remove(start_node_id)
+                next_node_id = self._seqanal.get_next_node_id(start_node_id,
+                                                              self._variables)
+                self._current_nodes.add(next_node_id)
+                # TODO: manage special node at this step. Warning: redondant with lines in the While
+
+        # Continue to run the sequence while there are still some nodes to run
+        while self._current_nodes:
+            # Start the current nodes in some new processes
+            for node_id in self._current_nodes:
+                # Get all necessary objects to start the new node
+                node_func_name = self._seqanal.get_function_name(node_id)
+                node_func_call = self._funcgrab.get_function(node_func_name)
+                node_func_args = self._seqanal.get_function_arguments(node_id)
+                node_timeout = self._seqanal.get_node_timeout(node_id)
+
+                # Start the new node in a process
+                process = mp.Process(target=self._run_node_function,
+                                     name="Node {}".format(node_id),
+                                     kwargs={'func': node_func_call,
+                                             'node_id': node_id,
+                                             'result_queue': self._result_queue,
+                                             'kwargs': node_func_args,
+                                             'timeout': node_timeout})
+
+            # A single queue is shared by all threads to provide function node
+            # results. To know when a function node is over (and therefore when
+            # to start the transition), the queue is polled for a result.
+            new_result = self._result_queue.get()
+
+            # TODO: manage end of a node and next transitions
+
+        self.status = SeqRunnerStatus.RUNNING  # useless if blocking call
 
     def pause(self):
         self.status = SeqRunnerStatus.PAUSING
