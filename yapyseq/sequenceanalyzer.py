@@ -167,6 +167,8 @@ class SequenceAnalyzer(object):
 
         # TODO: Check that there is no node without transitions.
         # TODO: check compliance between transition IDs and node IDs
+        # TODO: check that start nodes do not have IN transitions
+        # TODO: check that stop nodes do not have OUT transitions
 
     def get_sequence_name(self) -> str:
         """Return the name of the sequence.
