@@ -24,7 +24,7 @@ from .sequenceanalyzer import SequenceAnalyzer
 # ------------------------------------------------------------------------------
 
 ExceptInfo = namedtuple("ExceptInfo", "is_raised name args")
-NodeResult = namedtuple("NodeResult", "exception returned")
+NodeResult = namedtuple("NodeResult", "node_id exception returned")
 
 
 class SeqRunnerStatus(Enum):
@@ -90,7 +90,7 @@ class SequenceRunner(object):
         self.status = SeqRunnerStatus.INITIALIZED
 
     @staticmethod
-    def _create_node_result(exception, returned_val) -> NodeResult:
+    def _create_node_result(node_id, exception, returned_val) -> NodeResult:
         """Return an easy data structure containing result of a node.
 
         Args:
@@ -107,28 +107,30 @@ class SequenceRunner(object):
         else:
             except_info = ExceptInfo(False, None, None)
 
-        res = NodeResult(except_info, returned_val)
+        res = NodeResult(node_id, except_info, returned_val)
 
         return res
 
     @staticmethod
-    def _run_node_function(func: Callable, semaphore: mp.Semaphore, result_queue: mp.Queue,
-                           args: Dict = None, timeout: int = None) -> None:
-        """Function that can be called in a thread to run a node function and share its result.
+    def _run_node_function(func: Callable, node_id: int,
+                           result_queue: mp.Queue, args: Dict = None,
+                           timeout: int = None) -> None:
+        """Function that can be called in a thread to run a node function.
 
         This function must:
           * Run the given callable that has been given, with the given arguments
           * Manage a Timeout on this callable
           * Provide the result of the callable through a Queue
-          * Notify the end of itself using a semaphore
 
         Args:
             func: The function to be run. Must be a callable.
-            semaphore: The semaphore that must be released when _run_node_function() is over.
-            result_queue: The Queue object to store the result of the node function.
-              The stored object will be of type NodeResult.
+            node_id: The ID of the node containing the function. It is only used
+              to be stored in the result object.
+            result_queue: The Queue object to store the result of the node
+              function. The stored object will be of type NodeResult.
             args: (optional) The arguments to give to the function.
-            timeout: (optional) The time limit for the function to be terminated.
+            timeout: (optional) The time limit for the function to be
+              terminated.
         """
 
         # TODO: manage timeout
@@ -137,16 +139,12 @@ class SequenceRunner(object):
         try:
             func_res = func(**args)
         except Exception as e:
-            res = SequenceRunner._create_node_result(e, None)
+            res = SequenceRunner._create_node_result(node_id, e, None)
         else:
-            res = SequenceRunner._create_node_result(None, func_res)
+            res = SequenceRunner._create_node_result(node_id, None, func_res)
 
         # Provide result through the Queue
         result_queue.put(res)
-
-        # End of _run_node_function(),
-        # release the semaphore to notify the end of one node.
-        semaphore.release()
 
     # --------------------------------------------------------------------------
     # Public methods
@@ -166,6 +164,9 @@ class SequenceRunner(object):
         Raises:
 
         """
+        # A single queue is shared by all threads to provide function node
+        # results. To know when a function node is over (and therefore when to
+        # start the transition), the queue is polled for a result.
         self.status = SeqRunnerStatus.RUNNING
 
     def pause(self):
