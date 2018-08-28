@@ -99,3 +99,9 @@ List of built-in variables:
                 result.exception.name
                 result.exception.args
 
+# Ideas
+
+Set priorities on transitions. Priorities sharing the same source node must have
+unique priorities among them. When evaluating transitions to find the next node,
+priorities can be used to select only one transitions when several are possible.
+Special nodes "parallel split" do not need priorities on their transitions.

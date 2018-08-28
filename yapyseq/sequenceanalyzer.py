@@ -11,7 +11,7 @@ import os
 import yaml
 import yamale
 from collections import Counter
-from typing import Union, List, Set
+from typing import Union, Set
 
 # ------------------------------------------------------------------------------
 # MODULE CONSTANTS
@@ -250,7 +250,8 @@ class SequenceAnalyzer(object):
         except KeyError:
             return None
 
-    def get_next_node_id(self, src_node_id: int, variables: dict) -> List[int]:
+    def get_next_node_id(self, src_node_id: int,
+                         variables: dict) -> Union[int, Set[int]]:
         """Return the next node to run after the given source node.
 
         Transitions will be analyzed, using the given variables to assess
@@ -263,11 +264,17 @@ class SequenceAnalyzer(object):
               conditions of the transitions might require.
 
         Returns:
-              A list of IDs of every next nodes to run,
-              targets of the winning transitions.
+              The ID of the next node to be run next.
+              If source node is a special node "parallel split",
+              returns a set of IDs of every next nodes to run next.
 
         Raises:
             KeyError: if the src_node_id is not a valid node id.
+            MultipleTransitionError: if several transitions are possible whereas
+              the source node is not a "parallel split" node.
+              TODO: implement priorities, avoiding this error.
+            NoTransitionError: if no transition is possible. Note that this
+              function should not be called for a "stop" node.
         """
         if src_node_id not in self._seq_nodes.keys():
             raise KeyError("Node ID {} is not a valid ID.".format(src_node_id))
@@ -300,12 +307,35 @@ class SequenceAnalyzer(object):
                 if cond_res is True:
                     winner_ids.append(cid)
 
-        # Create the list of target nodes, based on the transition winners
-        target_nodes = list(set(
+        # Create the set of target nodes, based on the transition winners
+        target_nodes = set(
             [t['target'] for t in self._seq_trans.values()
-             if t['id'] in winner_ids]))
+             if t['id'] in winner_ids])
 
-        return target_nodes
+        # Check to raise NoTransitionError
+        # A node MUST have at least one output transition.
+        if len(target_nodes) == 0:
+            raise NoTransitionError(("Node n°{} does not have any successful "
+                                     "transition.").format(src_node_id))
+
+        # Manage the special case of "parallel_split
+        if ('special' in self._seq_nodes and
+                self._seq_nodes[src_node_id]['special'] == "parallel_split"):
+            return_value = target_nodes
+        else:
+            # Check to raise MultipleTransitionError
+            # If source node is a normal node, it cannot have several
+            # output transitions
+            if len(target_nodes) > 1:
+                raise MultipleTransitionError(
+                    ("Node n°{} has several successful transitions but is "
+                     "not allowed to.").format(src_node_id))
+            else:
+                # Return an int instead of a list
+                # if the source node is not a "parallel split"
+                return_value = target_nodes.pop()
+
+        return return_value
 
     def get_all_node_functions(self) -> Set[str]:
         """Get the name of all the node functions in the sequence.
