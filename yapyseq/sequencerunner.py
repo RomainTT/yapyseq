@@ -36,6 +36,7 @@ class SeqRunnerStatus(Enum):
     STOPPED = 4
     INITIALIZED = 5
 
+
 # ------------------------------------------------------------------------------
 # Main class
 # ------------------------------------------------------------------------------
@@ -81,6 +82,10 @@ class SequenceRunner(object):
         self._seqanal = SequenceAnalyzer(sequence_path)
         self._variables = variables
 
+        # Add an empty dict of results in the variables
+        # It will be filled with node results while the sequence is running.
+        self._variables['results'] = dict()
+
         # See SequenceRunner.run() for the uses of the following attribute.
         self._result_queue = mp.Queue()
 
@@ -89,15 +94,21 @@ class SequenceRunner(object):
         self._funcgrab.import_functions(func_dir,
                                         self._seqanal.get_all_node_functions())
 
-        # Initialize current nodes
-        # The set of nodes that are currently processed
-        self._current_nodes = self._seqanal.get_start_node_ids()
+        # Initialize new_nodes
+        # A set of node that must be analyzed and run as soon as possible
+        self._new_nodes = self._seqanal.get_start_node_ids()
+
+        # Initialize running_nodes
+        # A dictionary of nodes that are currently running
+        # Node ids are keys, and their processes are values
+        self._running_nodes = dict()
 
         # Update status
         self.status = SeqRunnerStatus.INITIALIZED
 
     @staticmethod
-    def _create_node_result(node_id: int, exception: Exception, returned_obj) -> NodeResult:
+    def _create_node_result(node_id: int, exception: Exception,
+                            returned_obj) -> NodeResult:
         """Return an easy data structure containing result of a node.
 
         Args:
@@ -173,20 +184,41 @@ class SequenceRunner(object):
         # TODO: implement the non blocking feature
         # This implies to manage a new call to "run" after pause has been called
 
-        # If this is the first time that run() is called,
-        # current nodes are start nodes and transitions are immediately done
-        if self.status is SeqRunnerStatus.INITIALIZED:
-            for start_node_id in self._current_nodes:
-                self._current_nodes.remove(start_node_id)
-                next_node_id = self._seqanal.get_next_node_id(start_node_id,
-                                                              self._variables)
-                self._current_nodes.add(next_node_id)
-                # TODO: manage special node at this step. Warning: redondant with lines in the While
-
         # Continue to run the sequence while there are still some nodes to run
-        while self._current_nodes:
-            # Start the current nodes in some new processes
-            for node_id in self._current_nodes:
+        while self._running_nodes or self._new_nodes:
+            # First of all, analyze new nodes and find nodes to start
+            nodes_to_start = list()
+            for node_id in self._new_nodes:
+                # Check if this node is a special node
+                special = self._seqanal.get_node_special(node_id)
+                if special:
+                    # If the node is a "start" node, just get the next node
+                    if special == "start":
+                        self._new_nodes.remove(node_id)
+                        next_node_id = self._seqanal.get_next_node_id(node_id,
+                                                                      self._variables)
+                        self._new_nodes.add(next_node_id)
+                    # If the node is "stop" node, just remove it.
+                    elif special == "stop":
+                        self._new_nodes.remove(node_id)
+                    # If the node is a "parallel split", get all next nodes
+                    elif special == "parallel_split":
+                        self._new_nodes.remove(node_id)
+                        next_node_ids = self._seqanal.get_next_node_id(node_id,
+                                                                       self._variables)
+                        self._new_nodes.update(next_node_ids)
+                    # If the node is a "parallel sync", TODO: manage sync
+                    elif special == "parallel_sync":
+                        pass
+                    else:
+                        raise ValueError("Value of attribute 'special' is"
+                                         " unknown: {}".format(special))
+                # If the node is normal, add it to the list of nodes to start
+                else:
+                    nodes_to_start.append(node_id)
+
+            # Then, start new processes if their are nodes to run
+            for node_id in nodes_to_start:
                 # Get all necessary objects to start the new node
                 node_func_name = self._seqanal.get_function_name(node_id)
                 node_func_call = self._funcgrab.get_function(node_func_name)
@@ -201,13 +233,31 @@ class SequenceRunner(object):
                                              'result_queue': self._result_queue,
                                              'kwargs': node_func_args,
                                              'timeout': node_timeout})
+                # Store this process in the dict of running nodes
+                self._running_nodes[node_id] = process
 
-            # A single queue is shared by all threads to provide function node
-            # results. To know when a function node is over (and therefore when
-            # to start the transition), the queue is polled for a result.
-            new_result = self._result_queue.get()
+            # Finally, if there are no new nodes to analyze,
+            # and some running nodes, just wait for the end of one of them.
+            if not self._new_nodes and self._running_nodes:
+                # A single queue is shared by all threads to provide function
+                # node results. To know when a function node is over the queue
+                # is polled for a result.
+                # The queue provides objects of type NodeResult
+                new_result = self._result_queue.get()
 
-            # TODO: manage end of a node and next transitions
+                # Save this result into the sequence variables
+                self._variables['results'][new_result.node_id] = new_result
+
+                # Remove this node from the running nodes
+                self._running_nodes.pop(new_result.node_id)
+
+                # Get the next node according to transitions
+                next_id = self._seqanal.get_next_node_id(new_result.node_id,
+                                                         self._variables)
+
+                # Add this next node to new nodes,
+                # it will be handled on the next loop iteration
+                self._new_nodes.add(next_id)
 
         self.status = SeqRunnerStatus.RUNNING  # useless if blocking call
 

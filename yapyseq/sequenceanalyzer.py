@@ -248,6 +248,7 @@ class SequenceAnalyzer(object):
         try:
             return node['special']
         except KeyError:
+            # This node has no 'special' attribute
             return None
 
     def get_next_node_id(self, src_node_id: int,
