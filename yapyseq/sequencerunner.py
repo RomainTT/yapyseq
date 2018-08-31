@@ -177,9 +177,6 @@ class SequenceRunner(object):
               to run. If set to False, the runner will be launched in a new
               thread. This is useful if one wants to be able to call pause()
               and stop() while the sequence is running.
-
-        Raises:
-
         """
         # TODO: implement the non blocking feature
         # This implies to manage a new call to "run" after pause has been called
@@ -188,7 +185,10 @@ class SequenceRunner(object):
         while self._running_nodes or self._new_nodes:
             # First of all, analyze new nodes and find nodes to start
             nodes_to_start = list()
-            for node_id in self._new_nodes:
+            # Create a copy of new_nodes for iterations because
+            # self._new_nodes will be modified inside the for loop
+            new_nodes_iter = self._new_nodes.copy()
+            for node_id in new_nodes_iter:
                 # Check if this node is a special node
                 special = self._seqanal.get_node_special(node_id)
                 if special:
@@ -233,11 +233,14 @@ class SequenceRunner(object):
                                              'result_queue': self._result_queue,
                                              'kwargs': node_func_args,
                                              'timeout': node_timeout})
+                process.start()
                 # Store this process in the dict of running nodes
                 self._running_nodes[node_id] = process
+                # Remove this node from the list of new nodes
+                self._new_nodes.remove(node_id)
 
-            # Finally, if there are no new nodes to analyze,
-            # and some running nodes, just wait for the end of one of them.
+            # Finally, if there are some running nodes,
+            # just wait for the end of one of them.
             if not self._new_nodes and self._running_nodes:
                 # A single queue is shared by all threads to provide function
                 # node results. To know when a function node is over the queue
