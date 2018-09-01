@@ -320,7 +320,7 @@ class SequenceAnalyzer(object):
                                      "transition.").format(src_node_id))
 
         # Manage the special case of "parallel_split
-        if ('special' in self._seq_nodes and
+        if ('special' in self._seq_nodes[src_node_id] and
                 self._seq_nodes[src_node_id]['special'] == "parallel_split"):
             return_value = target_nodes
         else:
