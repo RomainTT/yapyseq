@@ -8,7 +8,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 from collections import namedtuple
-from typing import Callable, Dict
+from typing import Callable, Dict, Set, Union, Any
 import multiprocessing as mp
 from enum import Enum
 
@@ -20,12 +20,16 @@ from .sequenceanalyzer import SequenceAnalyzer
 # ------------------------------------------------------------------------------
 
 
+class UnknownSpecialError(ValueError):
+    pass
+
 # ------------------------------------------------------------------------------
 # Custom types for this module
 # ------------------------------------------------------------------------------
 
 ExceptInfo = namedtuple("ExceptInfo", "is_raised name args")
 NodeResult = namedtuple("NodeResult", "node_id exception returned")
+NewNode = namedtuple("NewNode", "node_id previous_node_id")
 
 
 class SeqRunnerStatus(Enum):
@@ -95,20 +99,31 @@ class SequenceRunner(object):
                                         self._seqanal.get_all_node_functions())
 
         # Initialize new_nodes
-        # A set of node that must be analyzed and run as soon as possible
-        self._new_nodes = self._seqanal.get_start_node_ids()
+        # A set of node that must be analyzed and run as soon as possible.
+        # new_nodes is a set of NewNodes
+        # At initialization, previous nodes are set as None
+        self._new_nodes: Set[NewNode] = set()
+        start_nodes_id = self._seqanal.get_start_node_ids()
+        self._add_new_nodes(start_nodes_id, None)
 
         # Initialize running_nodes
         # A dictionary of nodes that are currently running
         # Node ids are keys, and their processes are values
-        self._running_nodes = dict()
+        self._running_nodes: Dict[int, mp.Process] = dict()
+
+        # Initialize status of synchronization nodes.
+        # This variable will be used to manage special nodes "parallel_sync"
+        # It is a dictionary of sets. Each key is the node_id of a
+        # "parallel_sync" node, and sets contain the IDs of the transitions
+        # that have already been performed to this synchronization node.
+        self._parallel_sync_history: Dict[int, Set] = dict()
 
         # Update status
         self.status = SeqRunnerStatus.INITIALIZED
 
     @staticmethod
-    def _create_node_result(node_id: int, exception: Exception,
-                            returned_obj) -> NodeResult:
+    def _create_node_result(node_id: int, exception: Union[None, Exception],
+                            returned_obj: Any) -> NodeResult:
         """Return an easy data structure containing result of a node.
 
         Args:
@@ -164,6 +179,91 @@ class SequenceRunner(object):
         # Provide result through the Queue
         result_queue.put(res)
 
+    def _add_new_nodes(self, new_nodes: Union[int, Set[int]],
+                       previous_node: Union[int, None]) -> None:
+        """Add one or several new nodes to self._new_nodes.
+
+        Warning:
+            This method should only be used in the run() function of this class,
+            or during initialization in __init__().
+            It modifies the internal state of the SequenceRunner object.
+
+        Args:
+            new_nodes: The ID or a set of IDs of the new nodes to add.
+            previous_node: the ID of the previous node of the new one.
+        """
+        if type(new_nodes) is int:
+            self._new_nodes.add(NewNode(new_nodes, previous_node))
+        elif type(new_nodes) is set:
+            self._new_nodes.update([NewNode(n, previous_node)
+                                    for n in new_nodes])
+
+    def _manage_special_node(self, new_node: NewNode) -> None:
+        """Manage a new node which is special in the running sequence.
+
+        Warning:
+            This method should only be used in the run() function of this class.
+            It modifies the internal state of the SequenceRunner object.
+
+        Args:
+            new_node: the NewNode object which has a special attribute.
+
+        Raises:
+            ValueError: if the given new_node does not have a special attribute.
+            UnknownSpecialError: if the given node has an unknown special
+              attribute.
+        """
+        special = self._seqanal.get_node_special(new_node.node_id)
+        if not special:
+            raise ValueError(("This new node (n°{}) does not have a special "
+                              "attribute. It should not be passed to this "
+                              "function.").format(new_node.node_id))
+
+        # If the node is a "start" node, just get the next node
+        if special == "start":
+            next_node_id = self._seqanal.get_next_node_id(
+                new_node.node_id,
+                self._variables)
+            self._add_new_nodes(next_node_id, new_node.node_id)
+
+        # If the node is "stop" node, do nothing
+        elif special == "stop":
+            pass
+
+        # If the node is a "parallel split", get all next nodes
+        elif special == "parallel_split":
+            next_node_ids = self._seqanal.get_next_node_id(
+                new_node.node_id,
+                self._variables)
+            self._add_new_nodes(next_node_ids, new_node.node_id)
+
+        # If the node is a "parallel sync"
+        elif special == "parallel_sync":
+            nnid = new_node.node_id  # just to take less space
+
+            # Initialize the history of this parallel_sync
+            # if it does not exist yet
+            if nnid not in self._parallel_sync_history:
+                self._parallel_sync_history[nnid] = set()
+
+            # Add this node to the history
+            self._parallel_sync_history[nnid].add(
+                new_node.previous_node_id)
+
+            # If all transitions met the parallel_sync
+            # Get the next node after the parallel_sync
+            prev = self._seqanal.get_all_prev_node_ids(nnid)
+            if prev == self._parallel_sync_history[nnid]:
+                self._parallel_sync_history[nnid].clear()
+                next_node_id = self._seqanal.get_next_node_id(
+                    nnid,
+                    self._variables)
+                self._add_new_nodes(next_node_id, nnid)
+        else:
+            raise UnknownSpecialError("Value of attribute 'special' is"
+                                      " unknown: {}".format(special))
+
+
     # --------------------------------------------------------------------------
     # Public methods
     # --------------------------------------------------------------------------
@@ -185,37 +285,22 @@ class SequenceRunner(object):
         while self._running_nodes or self._new_nodes:
             # First of all, analyze new nodes and find nodes to start
             nodes_to_start = list()
+
             # Create a copy of new_nodes for iterations because
             # self._new_nodes will be modified inside the for loop
             new_nodes_iter = self._new_nodes.copy()
-            for node_id in new_nodes_iter:
+
+            for new_node in new_nodes_iter:
+                # Remove this node from the set
+                self._new_nodes.remove(new_node)
+
                 # Check if this node is a special node
-                special = self._seqanal.get_node_special(node_id)
+                special = self._seqanal.get_node_special(new_node.node_id)
                 if special:
-                    # If the node is a "start" node, just get the next node
-                    if special == "start":
-                        self._new_nodes.remove(node_id)
-                        next_node_id = self._seqanal.get_next_node_id(node_id,
-                                                                      self._variables)
-                        self._new_nodes.add(next_node_id)
-                    # If the node is "stop" node, just remove it.
-                    elif special == "stop":
-                        self._new_nodes.remove(node_id)
-                    # If the node is a "parallel split", get all next nodes
-                    elif special == "parallel_split":
-                        self._new_nodes.remove(node_id)
-                        next_node_ids = self._seqanal.get_next_node_id(node_id,
-                                                                       self._variables)
-                        self._new_nodes.update(next_node_ids)
-                    # If the node is a "parallel sync", TODO: manage sync
-                    elif special == "parallel_sync":
-                        pass
-                    else:
-                        raise ValueError("Value of attribute 'special' is"
-                                         " unknown: {}".format(special))
+                    self._manage_special_node(new_node)
                 # If the node is normal, add it to the list of nodes to start
                 else:
-                    nodes_to_start.append(node_id)
+                    nodes_to_start.append(new_node.node_id)
 
             # Then, start new processes if their are nodes to run
             for node_id in nodes_to_start:
@@ -236,8 +321,6 @@ class SequenceRunner(object):
                 process.start()
                 # Store this process in the dict of running nodes
                 self._running_nodes[node_id] = process
-                # Remove this node from the list of new nodes
-                self._new_nodes.remove(node_id)
 
             # Finally, if there are some running nodes,
             # just wait for the end of one of them.
@@ -260,7 +343,7 @@ class SequenceRunner(object):
 
                 # Add this next node to new nodes,
                 # it will be handled on the next loop iteration
-                self._new_nodes.add(next_id)
+                self._new_nodes.add(NewNode(next_id, new_result.node_id))
 
         self.status = SeqRunnerStatus.RUNNING  # useless if blocking call
 
