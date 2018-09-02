@@ -375,3 +375,45 @@ class SequenceAnalyzer(object):
                 start_node_ids.add(node_id)
 
         return start_node_ids
+
+    def get_all_prev_node_ids(self, node_id: int) -> Set[int]:
+        """Get all the IDs of the nodes that can lead to the given one.
+
+        It will return all the node IDs that have a transition to the given
+        node id, regardless the validity of the transitions. It can be seen as
+        all the possible ancestors of the given node id.
+
+        Args:
+            node_id: the id of the target node.
+
+        Raises:
+            KeyError: if the node_id is not a valid node id.
+        """
+        if node_id not in self._seq_nodes.keys():
+            raise KeyError("Node ID {} is not a valid ID.".format(node_id))
+
+        prev_nodes = set([t['source'] for t in self._seq_trans.values()
+                          if t['target'] == node_id])
+
+        return prev_nodes
+
+    def get_all_next_node_ids(self, node_id: int) -> Set[int]:
+        """Get all the IDs of the nodes that can be reached from the given one.
+
+        It will return all the node IDs that are targeted by the given node id,
+        regardless the validity of the transitions. It can be seen as all the
+        possible next nodes of the given node id.
+
+        Args:
+            node_id: the id of the source node.
+
+        Raises:
+            KeyError: if the node_id is not a valid node id.
+        """
+        if node_id not in self._seq_nodes.keys():
+            raise KeyError("Node ID {} is not a valid ID.".format(node_id))
+
+        next_nodes = set([t['target'] for t in self._seq_trans.values()
+                          if t['source'] == node_id])
+
+        return next_nodes
