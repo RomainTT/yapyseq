@@ -71,7 +71,7 @@ class SequenceAnalyzer(object):
     return a complex dictionary with all the data inside. This choice is made
     to improve the readability of the code which uses this class.
 
-    # TODO: implement sub-sequences (detect them. with 'special' maybe ?)
+    # TODO: implement sub-sequences (detect them. with 'type' maybe ?)
     """
 
     # --------------------------------------------------------------------------
@@ -230,26 +230,21 @@ class SequenceAnalyzer(object):
         except KeyError:
             return None
 
-    def get_node_special(self, node_id: int) -> Union[str, None]:
-        """Return the special functionality of a given node.
+    def get_node_type(self, node_id: int) -> Union[str, None]:
+        """Return the type of a given node.
 
         Args:
             node_id: the id of the node from which info will be retrieved.
 
         Returns:
-            The name of the special functionality. Name is part of an
-            enumeration that can be found in the schema file.
-            None if special is omitted.
+            The name of the type of the node. Types are defined
+            in the schema file.
 
         Raises:
             KeyError: if the node_id does not exist in the list of nodes.
         """
         node = self._seq_nodes[node_id]
-        try:
-            return node['special']
-        except KeyError:
-            # This node has no 'special' attribute
-            return None
+        return node['type']
 
     def get_next_node_id(self, src_node_id: int,
                          variables: dict) -> Union[int, Set[int]]:
@@ -266,7 +261,7 @@ class SequenceAnalyzer(object):
 
         Returns:
               The ID of the next node to be run next.
-              If source node is a special node "parallel split",
+              If source node is of type "parallel split",
               returns a set of IDs of every next nodes to run next.
 
         Raises:
@@ -320,8 +315,7 @@ class SequenceAnalyzer(object):
                                      "transition.").format(src_node_id))
 
         # Manage the special case of "parallel_split
-        if ('special' in self._seq_nodes[src_node_id] and
-                self._seq_nodes[src_node_id]['special'] == "parallel_split"):
+        if self._seq_nodes[src_node_id]['type'] == "parallel_split":
             return_value = target_nodes
         else:
             # Check to raise MultipleTransitionError
@@ -341,20 +335,18 @@ class SequenceAnalyzer(object):
     def get_all_node_functions(self) -> Set[str]:
         """Get the name of all the node functions in the sequence.
 
-        Only nodes without a non-null parameter "special" are considered.
-        Nodes that have a "special" functionality do not need to provide a
-        function.
+        Only nodes of type 'function' are browsed. Other nodes do not
+        provide functions.
 
         Returns:
             A set of strings being the names of all the node functions in the
-            sequence. Except for "special" nodes.
+            sequence.
         """
         function_names = set()
 
         # Browse nodes
         for node in self._seq_nodes.values():
-            # Avoid special nodes
-            if "special" not in node:
+            if node['type'] == 'function':
                 function_names.add(node['function'])
 
         return function_names
@@ -363,15 +355,13 @@ class SequenceAnalyzer(object):
         """Get the IDs of all the start nodes in the sequence.
 
         Returns:
-            A Set of integers being the IDs of the nodes with a key "special"
-            of value "start".
+            A Set of integers being the IDs of the nodes of type 'start'.
         """
         start_node_ids = set()
 
         # Browse nodes
         for node_id, node in self._seq_nodes.items():
-            # Check only special nodes
-            if "special" in node and node["special"] == "start":
+            if node["type"] == "start":
                 start_node_ids.add(node_id)
 
         return start_node_ids

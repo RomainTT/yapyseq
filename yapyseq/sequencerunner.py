@@ -20,12 +20,13 @@ from .sequenceanalyzer import SequenceAnalyzer
 # ------------------------------------------------------------------------------
 
 
-class UnknownSpecialError(ValueError):
+class UnknownTypeError(ValueError):
     pass
 
 # ------------------------------------------------------------------------------
 # Custom types for this module
 # ------------------------------------------------------------------------------
+
 
 ExceptInfo = namedtuple("ExceptInfo", "is_raised name args")
 NodeResult = namedtuple("NodeResult", "node_id exception returned")
@@ -112,7 +113,7 @@ class SequenceRunner(object):
         self._running_nodes: Dict[int, mp.Process] = dict()
 
         # Initialize status of synchronization nodes.
-        # This variable will be used to manage special nodes "parallel_sync"
+        # This variable will be used to manage nodes of type "parallel_sync"
         # It is a dictionary of sets. Each key is the node_id of a
         # "parallel_sync" node, and sets contain the IDs of the transitions
         # that have already been performed to this synchronization node.
@@ -161,7 +162,7 @@ class SequenceRunner(object):
               to be stored in the result object.
             result_queue: The Queue object to store the result of the node
               function. The stored object will be of type NodeResult.
-            args: (optional) The arguments to give to the function.
+            kwargs: (optional) The arguments to give to the function.
             timeout: (optional) The time limit for the function to be
               terminated.
         """
@@ -199,46 +200,45 @@ class SequenceRunner(object):
                                     for n in new_nodes])
 
     def _manage_special_node(self, new_node: NewNode) -> None:
-        """Manage a new node which is special in the running sequence.
+        """Manage a new node not of type 'function' in the running sequence.
 
         Warning:
             This method should only be used in the run() function of this class.
             It modifies the internal state of the SequenceRunner object.
 
         Args:
-            new_node: the NewNode object which has a special attribute.
+            new_node: the NewNode object which is not of type 'function'.
 
         Raises:
-            ValueError: if the given new_node does not have a special attribute.
-            UnknownSpecialError: if the given node has an unknown special
-              attribute.
+            ValueError: if the given new_node is of type 'function'.
+            UnknownTypeError: if the given node has an unknown type.
         """
-        special = self._seqanal.get_node_special(new_node.node_id)
-        if not special:
-            raise ValueError(("This new node (n°{}) does not have a special "
-                              "attribute. It should not be passed to this "
+        node_type = self._seqanal.get_node_type(new_node.node_id)
+        if node_type == 'function':
+            raise ValueError(("This new node (n°{}) is of type 'function'. "
+                              "It should not be given to this "
                               "function.").format(new_node.node_id))
 
         # If the node is a "start" node, just get the next node
-        if special == "start":
+        if node_type == "start":
             next_node_id = self._seqanal.get_next_node_id(
                 new_node.node_id,
                 self._variables)
             self._add_new_nodes(next_node_id, new_node.node_id)
 
         # If the node is "stop" node, do nothing
-        elif special == "stop":
+        elif node_type == "stop":
             pass
 
         # If the node is a "parallel split", get all next nodes
-        elif special == "parallel_split":
+        elif node_type == "parallel_split":
             next_node_ids = self._seqanal.get_next_node_id(
                 new_node.node_id,
                 self._variables)
             self._add_new_nodes(next_node_ids, new_node.node_id)
 
-        # If the node is a "parallel sync"
-        elif special == "parallel_sync":
+        # If the node is a "parallel sync"...
+        elif node_type == "parallel_sync":
             nnid = new_node.node_id  # just to take less space
 
             # Initialize the history of this parallel_sync
@@ -260,8 +260,8 @@ class SequenceRunner(object):
                     self._variables)
                 self._add_new_nodes(next_node_id, nnid)
         else:
-            raise UnknownSpecialError("Value of attribute 'special' is"
-                                      " unknown: {}".format(special))
+            raise UnknownTypeError("Type of given node is "
+                                   "unknown: {}".format(node_type))
 
 
     # --------------------------------------------------------------------------
@@ -295,8 +295,8 @@ class SequenceRunner(object):
                 self._new_nodes.remove(new_node)
 
                 # Check if this node is a special node
-                special = self._seqanal.get_node_special(new_node.node_id)
-                if special:
+                node_type = self._seqanal.get_node_type(new_node.node_id)
+                if node_type != "function":
                     self._manage_special_node(new_node)
                 # If the node is normal, add it to the list of nodes to start
                 else:
