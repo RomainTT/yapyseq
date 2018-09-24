@@ -10,7 +10,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from collections import namedtuple
 from typing import Callable, Dict, Set, Union, Any
 import multiprocessing as mp
+from queue import Empty as EmptyQueueException
 from enum import Enum
+import time
 
 from .functiongrabber import FunctionGrabber
 from .sequenceanalyzer import SequenceAnalyzer
@@ -20,7 +22,11 @@ from .sequenceanalyzer import SequenceAnalyzer
 # ------------------------------------------------------------------------------
 
 
-class UnknownTypeError(ValueError):
+class UnknownNodeTypeError(ValueError):
+    pass
+
+
+class NodeFunctionTimeout(TimeoutError):
     pass
 
 # ------------------------------------------------------------------------------
@@ -146,9 +152,40 @@ class SequenceRunner(object):
         return res
 
     @staticmethod
-    def _run_node_function(func: Callable, node_id: int,
-                           result_queue: mp.Queue, kwargs: Dict = None,
-                           timeout: int = None) -> None:
+    def _run_node_function_no_timeout(func: Callable, node_id: int,
+                                      result_queue: mp.Queue,
+                                      kwargs: Dict = None) -> None:
+        """Function that can be called in a thread to run a node function.
+
+        This function must:
+          * Run the given callable that has been given, with the given arguments
+          * Provide the result of the callable through a Queue
+
+        Args:
+            func: The function to be run. Must be a callable.
+            node_id: The ID of the node containing the function. It is only used
+              to be stored in the result object.
+            result_queue: The Queue object to store the result of the node
+              function. The stored object will be of type NodeResult.
+            kwargs: (optional) The arguments to give to the function.
+        """
+
+        # Run the callable
+        try:
+            func_res = func(**kwargs)
+        except Exception as e:
+            res = SequenceRunner._create_node_result(node_id, e, None)
+        else:
+            res = SequenceRunner._create_node_result(node_id, None, func_res)
+
+        # Provide result through the Queue
+        result_queue.put(res)
+
+    @staticmethod
+    def _run_node_function_with_timeout(func: Callable, node_id: int,
+                                        result_queue: mp.Queue,
+                                        kwargs: Dict = None,
+                                        timeout: int = None) -> None:
         """Function that can be called in a thread to run a node function.
 
         This function must:
@@ -166,19 +203,41 @@ class SequenceRunner(object):
             timeout: (optional) The time limit for the function to be
               terminated.
         """
-
-        # TODO: manage timeout
-
-        # Run the callable
-        try:
-            func_res = func(**kwargs)
-        except Exception as e:
-            res = SequenceRunner._create_node_result(node_id, e, None)
+        if not timeout:
+            # Just start the function without timeout
+            # and without creating a new thread.
+            # Note: this separate condition could be avoided because Queue.get
+            # manages a None timeout, but this implementation avoids creating
+            # unnecessary sub-threads, so it is better like this !
+            SequenceRunner._run_node_function_no_timeout(
+                func, node_id, result_queue, kwargs)
         else:
-            res = SequenceRunner._create_node_result(node_id, None, func_res)
-
-        # Provide result through the Queue
-        result_queue.put(res)
+            # Create a sub-result queue for the real run of the function
+            sub_result_queue = mp.Queue()
+            # Start the function in the new sub-thread
+            process = mp.Process(
+                target=SequenceRunner._run_node_function_no_timeout,
+                name="Node {} sub-thread".format(node_id),
+                kwargs={'func': func,
+                        'node_id': node_id,
+                        'result_queue': sub_result_queue,
+                        'kwargs': kwargs})
+            process.start()
+            result = None  # Just in case something goes wrong in try except
+            try:
+                # Wait until result or timeout
+                result = sub_result_queue.get(block=True, timeout=timeout)
+            except EmptyQueueException:
+                # timeout occurred !
+                # Create a timeout exception to put in the result
+                exception = NodeFunctionTimeout(
+                    "Function {} of node {} timed out !".format(func.__name__,
+                                                                node_id))
+                result = SequenceRunner._create_node_result(
+                    node_id, exception, None)
+            finally:
+                # Put the final result in the result queue
+                result_queue.put(result)
 
     def _add_new_nodes(self, new_nodes: Union[int, Set[int]],
                        previous_node: Union[int, None]) -> None:
@@ -211,7 +270,7 @@ class SequenceRunner(object):
 
         Raises:
             ValueError: if the given new_node is of type 'function'.
-            UnknownTypeError: if the given node has an unknown type.
+            UnknownNodeTypeError: if the given node has an unknown type.
         """
         node_type = self._seqanal.get_node_type(new_node.node_id)
         if node_type == 'function':
@@ -260,9 +319,8 @@ class SequenceRunner(object):
                     self._variables)
                 self._add_new_nodes(next_node_id, nnid)
         else:
-            raise UnknownTypeError("Type of given node is "
+            raise UnknownNodeTypeError("Type of given node is "
                                    "unknown: {}".format(node_type))
-
 
     # --------------------------------------------------------------------------
     # Public methods
@@ -311,13 +369,14 @@ class SequenceRunner(object):
                 node_timeout = self._seqanal.get_node_timeout(node_id)
 
                 # Start the new node in a process
-                process = mp.Process(target=self._run_node_function,
-                                     name="Node {}".format(node_id),
-                                     kwargs={'func': node_func_call,
-                                             'node_id': node_id,
-                                             'result_queue': self._result_queue,
-                                             'kwargs': node_func_args,
-                                             'timeout': node_timeout})
+                process = mp.Process(
+                    target=self._run_node_function_with_timeout,
+                    name="Node {}".format(node_id),
+                    kwargs={'func': node_func_call,
+                            'node_id': node_id,
+                            'result_queue': self._result_queue,
+                            'kwargs': node_func_args,
+                            'timeout': node_timeout})
                 process.start()
                 # Store this process in the dict of running nodes
                 self._running_nodes[node_id] = process
