@@ -42,6 +42,10 @@ class NoTransitionError(RuntimeError):
 class ConditionError(RuntimeError):
     pass
 
+
+class IncompatibleNodeType(ValueError):
+    pass
+
 # ------------------------------------------------------------------------------
 # Main class
 # ------------------------------------------------------------------------------
@@ -72,6 +76,7 @@ class SequenceAnalyzer(object):
     to improve the readability of the code which uses this class.
 
     # TODO: implement sub-sequences (detect them. with 'type' maybe ?)
+    # TODO: allow transition to use node names instead of ids
     """
 
     # --------------------------------------------------------------------------
@@ -189,7 +194,13 @@ class SequenceAnalyzer(object):
 
         Raises:
             KeyError: if the node_id does not exist in the list of nodes.
+            IncompatibleNodeType: if the node is not of type function
         """
+        node_type = self._seq_nodes[node_id]['type']
+        if node_type != 'function':
+            raise IncompatibleNodeType(("Cannot retrieve function name "
+                                        "because node {} is of type "
+                                        "{}.").format(node_id, node_type))
         return self._seq_nodes[node_id]['function']
 
     def get_function_arguments(self, node_id: int) -> Union[dict, None]:
@@ -204,10 +215,15 @@ class SequenceAnalyzer(object):
 
         Raises:
             KeyError: if the node_id does not exist in the list of nodes.
+            IncompatibleNodeType: if the node is not of type function
         """
-        node = self._seq_nodes[node_id]
+        node_type = self._seq_nodes[node_id]['type']
+        if node_type != 'function':
+            raise IncompatibleNodeType(("Cannot retrieve function arguments "
+                                        "because node {} is of type "
+                                        "{}.").format(node_id, node_type))
         try:
-            return node['arguments']
+            return self._seq_nodes[node_id]['arguments']
         except KeyError:
             return None
 
@@ -223,10 +239,15 @@ class SequenceAnalyzer(object):
 
         Raises:
             KeyError: if the node_id does not exist in the list of nodes.
+            IncompatibleNodeType: if the node is not of type function
         """
-        node = self._seq_nodes[node_id]
+        node_type = self._seq_nodes[node_id]['type']
+        if node_type != 'function':
+            raise IncompatibleNodeType(("Cannot retrieve function timeout "
+                                        "because node {} is of type "
+                                        "{}.").format(node_id, node_type))
         try:
-            return node['timeout']
+            return self._seq_nodes[node_id]['timeout']
         except KeyError:
             return None
 
@@ -407,3 +428,24 @@ class SequenceAnalyzer(object):
                           if t['source'] == node_id])
 
         return next_nodes
+
+    def get_assignations(self, node_id: int) -> dict:
+        """Get assignations of a node of type 'seq_type'.
+
+        Args:
+            node_id: the id of the node from which info will be retrieved.
+
+        Returns:
+            A dictionary where keys are variable names and values are
+            expressions which have to be evaluated.
+
+        Raises:
+            KeyError: if the node_id does not exist in the list of nodes.
+            IncompatibleNodeType: if the node is not of type function.
+        """
+        node_type = self._seq_nodes[node_id]['type']
+        if node_type != 'seq_var':
+            raise IncompatibleNodeType(("Cannot retrieve assignations "
+                                        "because node {} is of type "
+                                        "{}.").format(node_id, node_type))
+        return self._seq_nodes[node_id]['assignations']

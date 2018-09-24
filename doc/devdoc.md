@@ -83,7 +83,7 @@ of the `SequenceRunner`.
 There are different kinds of sequence variables:
   * Built-in variables, created and managed by yapyseq. For instance, the return
     value of nodes. They are read-only for users.
-  * User constants, defined in the sequence file and given by user when he
+  * User constants, defined in the sequence file or given by user when he
     runs the sequence. For instance, a comment about the run. They are read-only
     for users.
   * On-the-fly variables, created during the run of the sequence, for instance

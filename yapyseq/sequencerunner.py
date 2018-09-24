@@ -12,7 +12,6 @@ from typing import Callable, Dict, Set, Union, Any
 import multiprocessing as mp
 from queue import Empty as EmptyQueueException
 from enum import Enum
-import time
 
 from .functiongrabber import FunctionGrabber
 from .sequenceanalyzer import SequenceAnalyzer
@@ -27,6 +26,10 @@ class UnknownNodeTypeError(ValueError):
 
 
 class NodeFunctionTimeout(TimeoutError):
+    pass
+
+
+class ReadOnlyError(ValueError):
     pass
 
 # ------------------------------------------------------------------------------
@@ -77,13 +80,13 @@ class SequenceRunner(object):
     # Private methods
     # --------------------------------------------------------------------------
 
-    def __init__(self, func_dir: str, sequence_path: str, variables: dict):
+    def __init__(self, func_dir: str, sequence_path: str, constants: dict):
         """Initialize the runner with a given sequence.
 
         Args:
             func_dir: directory where to search the node functions for.
             sequence_path: path to the sequence file to run.
-            variables: sequence variables given for this run.
+            constants: sequence constants given for this run.
 
         Raises:
             Exceptions from SequenceAnalyzer and FunctionGrabber.
@@ -91,7 +94,12 @@ class SequenceRunner(object):
         # Create basic objects
         self._funcgrab = FunctionGrabber()
         self._seqanal = SequenceAnalyzer(sequence_path)
-        self._variables = variables
+        self._variables = constants
+
+        # Define the set of variables that are read-only
+        # There are yapyseq built-in variables and user constants
+        self._read_only_var = {'results'}
+        self._read_only_var.update(set(constants.keys()))
 
         # Add an empty dict of results in the variables
         # It will be filled with node results while the sequence is running.
@@ -318,9 +326,26 @@ class SequenceRunner(object):
                     nnid,
                     self._variables)
                 self._add_new_nodes(next_node_id, nnid)
+
+        # If the node is of type 'seq_var', evaluate expressions
+        elif node_type == "seq_var":
+            ass = self._seqanal.get_assignations(new_node.node_id)
+            # Do not allow to modify read-only sequence variables
+            inter = self._read_only_var.intersection(set(ass.keys()))
+            if inter:
+                raise ReadOnlyError(("Node {} tries to modify variables "
+                                     "{} but they are read-only variables."
+                                     "").format(new_node.node_id, inter))
+            # Evaluate expression for each variable
+            for var_name, expr in ass.items():
+                if type(expr) is str:
+                    value = eval(expr)
+                else:
+                    value = expr
+                self._variables[var_name] = value
         else:
             raise UnknownNodeTypeError("Type of given node is "
-                                   "unknown: {}".format(node_type))
+                                       "unknown: {}".format(node_type))
 
     # --------------------------------------------------------------------------
     # Public methods
@@ -338,6 +363,8 @@ class SequenceRunner(object):
         """
         # TODO: implement the non blocking feature
         # This implies to manage a new call to "run" after pause has been called
+
+        self.status = SeqRunnerStatus.RUNNING  # useless if blocking call
 
         # Continue to run the sequence while there are still some nodes to run
         while self._running_nodes or self._new_nodes:
@@ -404,7 +431,7 @@ class SequenceRunner(object):
                 # it will be handled on the next loop iteration
                 self._new_nodes.add(NewNode(next_id, new_result.node_id))
 
-        self.status = SeqRunnerStatus.RUNNING  # useless if blocking call
+        self.status = SeqRunnerStatus.STOPPED
 
     def pause(self):
         self.status = SeqRunnerStatus.PAUSING
