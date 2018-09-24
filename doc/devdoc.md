@@ -13,6 +13,7 @@ Some special nodes, managed by yapyseq:
   * stop
   * parallel_split
   * parallel_sync
+  * seq_var
  
 In any sequence, there is at least one start and one stop.
  
@@ -71,37 +72,46 @@ must be aware of this danger.
 A sequence can hold a certain amount of variables possesses by the 
 `SequenceRunner`. These variables can only be referenced in the sequence file.
 Node functions cannot use them directly, but some sequence variables can be 
-given to them through arguments.
+given to them through arguments. Only copies of variables are given to functions
+not references themselves to prevent conflicting accesses to a same variables.
 
-Sequence variables are fully managed by the a `SequenceRunner`: creation,
-transfer, deletion, update.
+Sequence variables are fully managed by the `SequenceRunner`: creation,
+transfer, deletion, update. This avoids access conflicts to sequences
+variables, because there is only one thread which modifies them: the thread
+of the `SequenceRunner`.
 
 There are different kinds of sequence variables:
   * Built-in variables, created and managed by yapyseq. For instance, the return
-    value of nodes.
+    value of nodes. They are read-only for users.
   * User constants, defined in the sequence file and given by user when he
-    runs the sequence. For instance, a comment about the run.
+    runs the sequence. For instance, a comment about the run. They are read-only
+    for users.
   * On-the-fly variables, created during the run of the sequence, for instance
-    to manage loop counts.
+    to manage loop counts. These variables are managed in special nodes of type
+    `seq_var`. In these nodes, a dictionary is given to create/update the
+    variables. In this dictionary, keys are the name of the variables and values
+    are Python statements that will be evaluated and stored in their
+    corresponding variable. These special nodes do not allow to modify built-in
+    variables and user constants.
     
 All of these variables can be used in conditions of transitions.
 
 List of built-in variables:
-  * Return values of every nodes (last run only)
-    A dedicated data structure is used to store the result of a node function.
-    It contains the exception if it raised one, and the return object.
-    Datastructure:
+  * returns: Return values of every nodes (last run only)
+      A dedicated data structure is used to store the result of a node function.
+      It contains the exception if it raised one, and the return object.
+      Datastructure:
         
-        result
-            result.returned
-            result.exception
-                result.exception.is_raised
-                result.exception.name
-                result.exception.args
+          result
+              result.returned
+              result.exception
+                  result.exception.is_raised
+                  result.exception.name
+                  result.exception.args
 
 # Ideas
 
 Set priorities on transitions. Priorities sharing the same source node must have
 unique priorities among them. When evaluating transitions to find the next node,
 priorities can be used to select only one transitions when several are possible.
-Special nodes "parallel split" do not need priorities on their transitions.
+Nodes of type "parallel_split" do not need priorities on their transitions.
