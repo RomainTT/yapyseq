@@ -115,7 +115,10 @@ class SequenceAnalyzer(object):
             loaded = yaml.safe_load(f)
 
         # Collect data into private attributes
-        self._seq_name = loaded['sequence']['info']['name']
+        if ('info' in loaded['sequence'] and
+                'name' in loaded['sequence']['info']):
+            self._seq_name = loaded['sequence']['info']['name']
+
         self._seq_nodes = dict((n['id'], n)
                                for n in loaded['sequence']['nodes'])
         self._seq_trans = dict((t['id'], t)
