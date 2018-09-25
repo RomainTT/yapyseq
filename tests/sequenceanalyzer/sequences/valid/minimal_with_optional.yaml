@@ -1,0 +1,19 @@
+sequence:
+
+  info:
+    name: minimal_with_optional
+
+  nodes:
+  - id: 0
+    type: start
+    name: start node
+
+  - id: 1
+    type: stop
+    name: stop node
+
+  transitions:
+  - id: 0
+    source: 0
+    target: 1
+
