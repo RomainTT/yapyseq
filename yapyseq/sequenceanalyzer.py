@@ -74,6 +74,9 @@ class SequenceAnalyzer(object):
     a single value like an integer or a string, instead of a few methods that
     return a complex dictionary with all the data inside. This choice is made
     to improve the readability of the code which uses this class.
+    Therefore, this class is not coded in a very Pythonic way. But this is on
+    purpose and a reflected decision. For instance, using properties instead of
+    getters would be more Pythonic, but less homogeneous and clear.
 
     # TODO: implement sub-sequences (detect them. with 'type' maybe ?)
     # TODO: allow transition to use node names instead of ids
