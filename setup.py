@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-from distutils.core import setup
+from setuptools import setup
 
 setup(name='yapyseq',
       version='0.1',
@@ -10,5 +10,6 @@ setup(name='yapyseq',
       author_email='romain@taprest.fr',
       url='',
       packages=['yapyseq'],
-      install_requires=['pyyaml', 'yamale']
+      install_requires=['pyyaml', 'yamale'],
+      tests_require=['pytest']
       )
