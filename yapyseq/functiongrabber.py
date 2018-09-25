@@ -7,7 +7,7 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
-from typing import Callable, List
+from typing import Callable, Set
 import os
 import sys
 from importlib import import_module
@@ -57,7 +57,7 @@ class FunctionGrabber(object):
         self._imported_functions = dict()
 
     @staticmethod
-    def _search_functions_in_file(file_path: str, func_set: set) -> List:
+    def _search_functions_in_file(file_path: str, func_set: Set) -> Set:
         """Search for a list of functions in a python file.
 
         Only first level functions are searched. It means they must be contained
@@ -69,8 +69,8 @@ class FunctionGrabber(object):
             func_set: The set of functions to search for.
 
         Returns:
-            The list of matching functions found in the file.
-            Empty list if none.
+            The set of matching functions found in the file.
+            Empty set if none.
 
         Raises:
             FileNotFoundError: if file_path lead to no real file.
@@ -81,7 +81,7 @@ class FunctionGrabber(object):
                                     " {}".format(file_path))
 
         # Initialize result as an empty list
-        found_func = []
+        found_func = set()
 
         with open(file_path, 'rb', 0) as f:
             # To know why mmap is used, read
@@ -96,14 +96,14 @@ class FunctionGrabber(object):
                     bpattern = bytes(spattern, "utf-8")  # files are utf-8
                     if re.search(bpattern, mfile, re.MULTILINE):
                         # Function has been found, append it to result
-                        found_func.append(func)
+                        found_func.add(func)
         return found_func
 
     # --------------------------------------------------------------------------
     # Public methods
     # --------------------------------------------------------------------------
 
-    def import_functions(self, directory: str, func_set: set):
+    def import_functions(self, directory: str, func_set: Set) -> None:
         """Search for functions in a directory and import them.
 
         Search is recursive, starting on given directory as top.
