@@ -1,0 +1,29 @@
+sequence:
+
+  info:
+    name: complexity 3
+
+  nodes:
+    - id: 0
+      type: start
+      name: start node
+
+    - id: 1
+      type: stop
+      name: stop node
+
+    - id: 2
+      type: seq_var
+      name: Dummy sequence variable node
+      assignations:
+        a: 1
+        b: 2
+
+  transitions:
+    - id: 0
+      source: 0
+      target: 2
+
+    - id: 1
+      source: 2
+      target: 1

@@ -1,0 +1,71 @@
+sequence:
+
+  info:
+    name: complexity 5
+
+  nodes:
+    - id: 0
+      type: start
+      name: start node
+
+    - id: 1
+      type: stop
+      name: stop node
+
+    - id: 2
+      type: function
+      name: Dummy node function
+      function: dummy_function
+
+    - id: 3
+      type: function
+      name: Dummy node function
+      function: dummy_function
+
+    - id: 4
+      type: function
+      name: Dummy node function
+      function: dummy_function
+
+    - id: 5
+      type: parallel_split
+      name: A parallel splitter node
+
+    - id: 6
+      type: parallel_sync
+      name: A parallel synchronizer node
+
+    - id: 7
+      type: seq_var
+      assignations:
+        a : 1
+        b : 2
+
+  transitions:
+    - id: 0
+      source: 0
+      target: 2
+
+    - id: 1
+      source: 2
+      target: 5
+
+    - id: 2
+      source: 5
+      target: 3
+
+    - id: 3
+      source: 5
+      target: 4
+
+    - id: 4
+      source: 3
+      target: 6
+
+    - id: 5
+      source: 4
+      target: 6
+
+    - id: 6
+      source: 6
+      target: 1

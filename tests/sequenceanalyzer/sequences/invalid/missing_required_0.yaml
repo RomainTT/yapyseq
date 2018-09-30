@@ -1,0 +1,24 @@
+sequence:
+
+  nodes:
+    - id: 0
+      # Missing type
+      name: start node
+
+    - id: 1
+      type: stop
+      name: stop node
+
+    - id: 2
+      type: function
+      name: Dummy node function
+      function: dummy_function
+
+  transitions:
+    - id: 0
+      source: 0
+      target: 2
+
+    - id: 1
+      source: 2
+      target: 1

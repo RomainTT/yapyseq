@@ -1,0 +1,12 @@
+sequence:
+
+  # Missing nodes
+
+  transitions:
+    - id: 0
+      source: 0
+      target: 2
+
+    - id: 1
+      source: 2
+      target: 1

@@ -1,0 +1,17 @@
+sequence:
+
+  nodes:
+    - id: 0
+      type: start
+      name: start node
+
+    - id: 1
+      type: stop
+      name: stop node
+
+    - id: 2
+      type: function
+      name: Dummy node function
+      function: dummy_function
+
+  # Missing transitions

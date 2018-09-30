@@ -1,0 +1,52 @@
+sequence:
+
+  info:
+    name: complexity 2
+
+  nodes:
+    - id: 0
+      type: start
+      name: start node
+
+    - id: 1
+      type: stop
+      name: stop node
+
+    - id: 2
+      type: function
+      name: Dummy node function
+      function: dummy_function
+
+    - id: 3
+      type: function
+      name: Dummy node function
+      function: dummy_function
+      arguments:
+        spam: 1
+        egg: "egg"
+
+    - id: 4
+      type: function
+      name: Dummy node function
+      function: dummy_function
+      arguments:
+        spam: 1
+        egg: "egg"
+      timeout: 10
+
+  transitions:
+    - id: 0
+      source: 0
+      target: 2
+
+    - id: 1
+      source: 2
+      target: 3
+
+    - id: 2
+      source: 3
+      target: 4
+
+    - id: 3
+      source: 4
+      target: 2

@@ -1,0 +1,13 @@
+sequence:
+
+  nodes:
+    - id: 0
+      type: start
+
+    - id: 0  # This is a redundant ID
+      type: stop
+
+  transitions:
+    - id: 0
+      source: 0
+      target: 1
