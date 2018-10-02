@@ -21,8 +21,6 @@ sequence:
 
   nodes: list(include('function_node'), include('simple_special_node'), include('variable_node'),  required=True)
 
-  transitions: list(include('transition'), required=True)
-
 
 # ------------------------------------------------------------------------------
 # Second document contains includes for the first document
@@ -35,6 +33,7 @@ function_node:
   function: str(required=True)  # name of the function to run
   arguments: map(required=False)  # args to give to the function
   timeout: int(required=False)  # timeout of the function, in sec
+  transition: list(include('transition'), required=True)
 
 simple_special_node:
   type: enum('start', 'stop', 'parallel_split', 'parallel_sync', required=True)
@@ -48,7 +47,5 @@ variable_node:
   assignations: map(required=True)  # variables and their assignations
 
 transition:
-  id: int(required=True)  # unique id of the transition
-  source: int(required=True)  # unique id of the source
   target: int(required=True)  # unique id of the target
   condition: str(required=False)  # condition expression TODO: make a custom Validator for conditions (see doc of yamale)

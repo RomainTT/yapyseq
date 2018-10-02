@@ -11,7 +11,8 @@ import os
 import yaml
 import yamale
 from collections import Counter
-from typing import Union, Set
+from typing import Union, Set, Dict
+from abc import ABC
 
 # ------------------------------------------------------------------------------
 # MODULE CONSTANTS
@@ -45,6 +46,148 @@ class ConditionError(RuntimeError):
 
 class IncompatibleNodeType(ValueError):
     pass
+
+
+# ------------------------------------------------------------------------------
+# Sub-objects classes
+# ------------------------------------------------------------------------------
+
+
+class Transition(object)
+    """Class representing a transition."""
+
+    def __init__(self, target: int, condition: str = None):
+        """Initialize a Transition.
+
+        Args:
+            target: the nid of the targeted Node.
+            condition: (optional) the condition to fulfill for this transition.
+        """
+        self._target = target
+        self._condition = condition
+
+    @property
+    def target(self):
+        return self._target
+
+    def is_condition_fulfilled(self, variables: Dict):
+        """Check if the condition is fulfilled with the given variables.
+
+        Args:
+            variables: a dictionary of variables that will be used to evaluate
+              the condition.
+        """
+        # Evaluate the condition as a Python expression.
+        # None is given as globals and variables are given as locals
+        cond_res = eval(self._condition, None, variables)
+
+        # If condition does not return a bool, raise an error
+        if type(cond_res) is not bool:
+            raise ConditionError("The following condition did not "
+                                 "return a boolean : "
+                                 "{}".format(self._condition))
+
+
+class Node(object):
+    """Class representing a Node.
+
+    This class is not likely to be instantiated, as some children class describe
+    the different types of nodes available in a sequence.
+    """
+
+    def __init__(self, nid: int, name: str = None):
+        """Initialize a Node.
+
+        Args:
+            nid: the unique ID of the node.
+            name: (optional) the name of the node.
+        """
+        self._nid = nid
+        self._name = name
+
+    @property
+    def nid(self) -> int:
+        """The unique ID of the node (read-only)."""
+        return self._nid
+
+    @property
+    def name(self) -> str:
+        """The name of the node. (read-only)
+
+        Name is None if no name has been provided.
+        """
+        return self._name
+
+
+class NodeWithTransitions(Node):
+    """Class representing a node which contains outgoing transitions.
+
+    This class is not likely to be instantiated, as some children class describe
+    the different types of nodes available in a sequence.
+    """
+
+    def __init__(self, nid: int, transitions: Set, name: str = None):
+        """Initialize a NodeWithTransitions.
+
+        Args:
+            nid: the unique ID of the node.
+            transitions: the outgoing transitions of the node.
+            name: (optional) the name of the node.
+        """
+        super().__init__(nid, name)
+        self._transitions = set([Transition(t['target'], t['condition'])
+                                 for t in transitions])
+
+    def get_all_next_node_ids(self) -> Set[int]:
+        """Get the IDs of every nodes that can be reached from this one.
+
+        It will return all the node IDs that are targeted by this current node,
+        regardless the validity of the transitions. It can be seen as all the
+        possible next nodes.
+
+        Returns:
+            A set of integers being the node ids of the possible next nodes.
+        """
+        return set([t.target for t in self._transitions])
+
+
+class FunctionNode(NodeWithTransitions):
+    """Class representing a node of type function."""
+
+    def __init__(self, nid: int, function_name: str,
+                 function_kwargs: Dict, transitions: Set,
+                 name: str = None, timeout: int = None):
+        """Initialize a FunctionNode.
+
+        Args:
+            nid: the unique ID of the node.
+            function_name: the name of the function to run in the node.
+            function_kwargs: the keyword arguments to give to the function.
+            transitions: the outgoing transitions of the node.
+            name: (optional) the name of the node.
+            timeout: (optional) the timeout limit of the function, in seconds.
+        """
+        super().__init__(nid, transitions, name)
+        self._function_name = function_name
+        self._function_kwargs = function_kwargs
+        self._timeout = timeout
+
+    @property
+    def function_name(self) -> str:
+        """The name of the function to run in the node (read-only)."""
+        return self._function_name
+
+    @property
+    def function_kwargs(self) -> Dict:
+        """The keyword arguments of the function to run (read-only)."""
+        return self._function_kwargs
+
+    @property
+    def timeout(self):
+        """The timeout limit of the function, in seconds (read-only).
+
+        Timeout is None if no timeout has been provided."""
+        return self._timeout
 
 # ------------------------------------------------------------------------------
 # Main class
@@ -181,98 +324,6 @@ class SequenceAnalyzer(object):
         # TODO: check that start nodes do not have IN transitions
         # TODO: check that stop nodes do not have OUT transitions
 
-    def get_sequence_name(self) -> str:
-        """Return the name of the sequence.
-
-        Returns:
-            Name of the sequence that has been used for initialization.
-        """
-        return self._seq_name
-
-    def get_function_name(self, node_id: int) -> str:
-        """Return the function name of a given node.
-
-        Args:
-            node_id: the id of the node from which info will be retrieved.
-
-        Returns:
-            Name of the function for the given node id.
-
-        Raises:
-            KeyError: if the node_id does not exist in the list of nodes.
-            IncompatibleNodeType: if the node is not of type function
-        """
-        node_type = self._seq_nodes[node_id]['type']
-        if node_type != 'function':
-            raise IncompatibleNodeType(("Cannot retrieve function name "
-                                        "because node {} is of type "
-                                        "{}.").format(node_id, node_type))
-        return self._seq_nodes[node_id]['function']
-
-    def get_function_arguments(self, node_id: int) -> Union[dict, None]:
-        """Return the function arguments of a given node.
-
-        Args:
-            node_id: the id of the node from which info will be retrieved.
-
-        Returns:
-            A dictionary containing the keyword arguments of the function.
-            None if arguments are omitted.
-
-        Raises:
-            KeyError: if the node_id does not exist in the list of nodes.
-            IncompatibleNodeType: if the node is not of type function
-        """
-        node_type = self._seq_nodes[node_id]['type']
-        if node_type != 'function':
-            raise IncompatibleNodeType(("Cannot retrieve function arguments "
-                                        "because node {} is of type "
-                                        "{}.").format(node_id, node_type))
-        try:
-            return self._seq_nodes[node_id]['arguments']
-        except KeyError:
-            return None
-
-    def get_node_timeout(self, node_id: int) -> Union[int, None]:
-        """Return the node timeout of a given node.
-
-        Args:
-            node_id: the id of the node from which info will be retrieved.
-
-        Returns:
-            The timeout value, in seconds.
-            None if timeout is omitted.
-
-        Raises:
-            KeyError: if the node_id does not exist in the list of nodes.
-            IncompatibleNodeType: if the node is not of type function
-        """
-        node_type = self._seq_nodes[node_id]['type']
-        if node_type != 'function':
-            raise IncompatibleNodeType(("Cannot retrieve function timeout "
-                                        "because node {} is of type "
-                                        "{}.").format(node_id, node_type))
-        try:
-            return self._seq_nodes[node_id]['timeout']
-        except KeyError:
-            return None
-
-    def get_node_type(self, node_id: int) -> Union[str, None]:
-        """Return the type of a given node.
-
-        Args:
-            node_id: the id of the node from which info will be retrieved.
-
-        Returns:
-            The name of the type of the node. Types are defined
-            in the schema file.
-
-        Raises:
-            KeyError: if the node_id does not exist in the list of nodes.
-        """
-        node = self._seq_nodes[node_id]
-        return node['type']
-
     def get_next_node_id(self, src_node_id: int,
                          variables: dict) -> Union[int, Set[int]]:
         """Return the next node to run after the given source node.
@@ -317,15 +368,7 @@ class SequenceAnalyzer(object):
             # Else, evaluate the condition of the transition
             else:
                 cond = self._seq_trans[cid]['condition']
-                # Evaluate the condition.
-                # None is given as globals,
-                # and variables are given as locals
-                cond_res = eval(cond, None, variables)
-                # If condition does not return a bool, raise an error
-                if type(cond_res) is not bool:
-                    raise ConditionError("The following condition does not "
-                                         "return a boolean : "
-                                         "{}".format(cond))
+                # TODO: use Transition.is_condition_fullfilled
                 # If condition is True, then append this transition to winners
                 if cond_res is True:
                     winner_ids.append(cid)
@@ -414,26 +457,6 @@ class SequenceAnalyzer(object):
 
         return prev_nodes
 
-    def get_all_next_node_ids(self, node_id: int) -> Set[int]:
-        """Get all the IDs of the nodes that can be reached from the given one.
-
-        It will return all the node IDs that are targeted by the given node id,
-        regardless the validity of the transitions. It can be seen as all the
-        possible next nodes of the given node id.
-
-        Args:
-            node_id: the id of the source node.
-
-        Raises:
-            KeyError: if the node_id is not a valid node id.
-        """
-        if node_id not in self._seq_nodes.keys():
-            raise KeyError("Node ID {} is not a valid ID.".format(node_id))
-
-        next_nodes = set([t['target'] for t in self._seq_trans.values()
-                          if t['source'] == node_id])
-
-        return next_nodes
 
     def get_assignations(self, node_id: int) -> dict:
         """Get assignations of a node of type 'seq_type'.
