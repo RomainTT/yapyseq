@@ -450,7 +450,7 @@ class SequenceAnalyzer(object):
             IncompatibleNodeType: if the node is not of type function.
         """
         node_type = self._seq_nodes[node_id]['type']
-        if node_type != 'seq_var':
+        if node_type != 'variable':
             raise IncompatibleNodeType(("Cannot retrieve assignations "
                                         "because node {} is of type "
                                         "{}.").format(node_id, node_type))

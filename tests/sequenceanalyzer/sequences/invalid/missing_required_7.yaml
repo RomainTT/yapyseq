@@ -10,7 +10,7 @@ sequence:
       name: stop node
 
     - id: 2
-      type: seq_var
+      type: variable
       # Missing assignations
 
   transitions:

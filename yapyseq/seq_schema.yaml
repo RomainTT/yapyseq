@@ -19,7 +19,7 @@ sequence:
   info:
     name: str(required=False)  # name of the sequence
 
-  nodes: list(include('function_node'), include('simple_special_node'), include('seq_var_node'),  required=True)
+  nodes: list(include('function_node'), include('simple_special_node'), include('variable_node'),  required=True)
 
   transitions: list(include('transition'), required=True)
 
@@ -41,8 +41,8 @@ simple_special_node:
   id: int(required=True)  # unique id of the node
   name: str(required=False)  # name of the node
 
-seq_var_node:
-  type: enum('seq_var', required=True)
+variable_node:
+  type: enum('variable', required=True)
   id: int(required=True)  # unique id of the node
   name: str(required=False)  # name of the node
   assignations: map(required=True)  # variables and their assignations

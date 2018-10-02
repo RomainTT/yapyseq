@@ -9,7 +9,7 @@ sequence:
       type: stop
       name: stop node
 
-    - type: seq_var
+    - type: variable
       assignations:
           a: 1
       # Missing ID

@@ -13,7 +13,7 @@ Some special nodes, managed by yapyseq:
   * stop
   * parallel_split
   * parallel_sync
-  * seq_var
+  * variable
  
 In any sequence, there is at least one start and one stop.
  
@@ -88,7 +88,7 @@ There are different kinds of sequence variables:
     for users.
   * On-the-fly variables, created during the run of the sequence, for instance
     to manage loop counts. These variables are managed in special nodes of type
-    `seq_var`. In these nodes, a dictionary is given to create/update the
+    `variable`. In these nodes, a dictionary is given to create/update the
     variables. In this dictionary, keys are the name of the variables and values
     are Python statements that will be evaluated and stored in their
     corresponding variable. These special nodes do not allow to modify built-in

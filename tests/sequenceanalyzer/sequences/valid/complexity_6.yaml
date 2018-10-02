@@ -36,7 +36,7 @@ sequence:
       name: A parallel synchronizer node
 
     - id: 7
-      type: seq_var
+      type: variable
       assignations:
         a : 1
         b : 2

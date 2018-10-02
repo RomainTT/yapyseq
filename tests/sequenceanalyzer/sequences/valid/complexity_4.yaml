@@ -13,7 +13,7 @@ sequence:
       name: stop node
 
     - id: 2
-      type: seq_var
+      type: variable
       name: Dummy sequence variable node
       assignations:
         a: 1

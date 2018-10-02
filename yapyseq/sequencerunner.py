@@ -327,8 +327,8 @@ class SequenceRunner(object):
                     self._variables)
                 self._add_new_nodes(next_node_id, nnid)
 
-        # If the node is of type 'seq_var', evaluate expressions
-        elif node_type == "seq_var":
+        # If the node is of type 'variable', evaluate expressions
+        elif node_type == "variable":
             ass = self._seqanal.get_assignations(new_node.node_id)
             # Do not allow to modify read-only sequence variables
             inter = self._read_only_var.intersection(set(ass.keys()))
