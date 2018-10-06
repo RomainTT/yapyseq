@@ -163,11 +163,8 @@ class SequenceAnalyzer(object):
                                          "unique : {}"
                                          ).format(item_type, *non_unique_ids))
 
-        # TODO: Check that there is no node without transitions.
         # TODO: check compliance between transition IDs and node IDs
         # TODO: check that start nodes do not have IN transitions
-        # TODO: check that stop nodes do not have OUT transitions
-
 
     def get_all_node_functions(self) -> Set[str]:
         """Get the name of all the node functions in the sequence.
@@ -188,7 +185,7 @@ class SequenceAnalyzer(object):
 
         return function_names
 
-    def get_start_node_ids(self) -> Set[int]:
+    def get_start_nodes(self):
         """Get the IDs of all the start nodes in the sequence.
 
         Returns:
