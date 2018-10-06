@@ -44,7 +44,7 @@ variable_node:
   type: enum('variable', required=True)
   id: int(required=True)  # unique id of the node
   name: str(required=False)  # name of the node
-  assignations: map(required=True)  # variables and their assignations
+  variables: map(required=True)  # variables and their assignations
 
 transition:
   target: int(required=True)  # unique id of the target
