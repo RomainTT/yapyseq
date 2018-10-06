@@ -77,6 +77,10 @@ class Transition(object)
             variables: a dictionary of variables that will be used to evaluate
               the condition.
         """
+        # If there is no condition, it is considered as fulfilled
+        if self._condition is None:
+            return True
+
         # Evaluate the condition as a Python expression.
         # None is given as globals and variables are given as locals
         cond_res = eval(self._condition, None, variables)
@@ -86,7 +90,9 @@ class Transition(object)
             raise ConditionError("The following condition did not "
                                  "return a boolean : "
                                  "{}".format(self._condition))
-
+        # Else, return the result
+        else:
+            return cond_res
 
 class Node(object):
     """Class representing a Node.
@@ -119,7 +125,7 @@ class Node(object):
         return self._name
 
 
-class NodeWithTransitions(Node):
+class TransitionalNode(Node):
     """Class representing a node which contains outgoing transitions.
 
     This class is not likely to be instantiated, as some children class describe
@@ -127,7 +133,7 @@ class NodeWithTransitions(Node):
     """
 
     def __init__(self, nid: int, transitions: Set, name: str = None):
-        """Initialize a NodeWithTransitions.
+        """Initialize a TransitionalNode.
 
         Args:
             nid: the unique ID of the node.
@@ -150,8 +156,81 @@ class NodeWithTransitions(Node):
         """
         return set([t.target for t in self._transitions])
 
+    def get_next_node_id(self, variables: dict) -> Union[int, Set[int]]:
+        """Return the next node to run in function of conditions.
 
-class FunctionNode(NodeWithTransitions):
+        Transitions will be analyzed, using the given variables to assess
+        their conditions, and winning transition(s) will lead to the next
+        nodes(s).
+
+        TODO: implement priorities among transitions
+
+        Args:
+            variables: dictionary that contains all the variables that the
+              conditions of the transitions might require. This dictionary will
+              be added to the local variables before evaluating the condition
+              expression.
+
+        Returns:
+            A set containing the IDs of all the next nodes to run next.
+
+        Raises:
+            NoTransitionError: if no transition is possible.
+        """
+        # This set will contain the conditions with a fulfilled condition
+        winning_transitions = set()
+
+        # For each candidate, check the condition
+        for transition in self._transitions:
+            if transition.is_condition_fulfilled(variables):
+                winning_transitions.add(transition)
+
+        # Create the set of target nodes, based on the winning transitions
+        target_nodes = set(t.target for t in winning_transitions)
+
+        # Check to raise NoTransitionError
+        # A node MUST have at least one output transition.
+        if len(target_nodes) == 0:
+            raise NoTransitionError(("Node n°{} does not have any successful "
+                                     "transition.").format(self.nid))
+
+        return target_nodes
+
+
+class SimpleTransitionalNode(TransitionalNode):
+    """Class representing a node that can have only one transition target.
+
+    This king of node can have several transitions, but when they are evaluated
+    to find the next node, only one transition can win.
+    """
+
+    def get_next_node_id(self, variables: dict):
+        """Overriding of parent class.
+
+        Raises:
+            MultipleTransitionError: if several transitions are fulfilled at
+              the same time, and therefore give several next nodes.
+        """
+        next_nodes = super().get_next_node_id(variables)
+        if len(next_nodes) > 1:
+            raise MultipleTransitionError(
+                "Start node n°{} has several transition targets ({}) "
+                "but it is forbidden.".format(self.nid, next_nodes))
+        else:
+            return next_nodes
+
+
+class StartNode(SimpleTransitionalNode):
+    """Class representing a node of type start."""
+    pass
+
+
+class StopNode(Node):
+    """Class representing a node of type stop."""
+    pass
+
+
+class FunctionNode(SimpleTransitionalNode):
     """Class representing a node of type function."""
 
     def __init__(self, nid: int, function_name: str,
@@ -188,6 +267,18 @@ class FunctionNode(NodeWithTransitions):
 
         Timeout is None if no timeout has been provided."""
         return self._timeout
+
+
+class VariableNode(SimpleTransitionalNode):
+    pass
+
+
+class ParallelSplitNode(TransitionalNode):
+    pass
+
+
+class ParallelSyncNode(SimpleTransitionalNode):
+    pass
 
 # ------------------------------------------------------------------------------
 # Main class
@@ -324,83 +415,6 @@ class SequenceAnalyzer(object):
         # TODO: check that start nodes do not have IN transitions
         # TODO: check that stop nodes do not have OUT transitions
 
-    def get_next_node_id(self, src_node_id: int,
-                         variables: dict) -> Union[int, Set[int]]:
-        """Return the next node to run after the given source node.
-
-        Transitions will be analyzed, using the given variables to assess
-        their conditions, and winning transition will lead to the next nodes(s).
-
-        Args:
-            src_node_id: the id of the node which is the source
-              of the transitions that will be analyzed.
-            variables: dictionary that contains all the variables that the
-              conditions of the transitions might require.
-
-        Returns:
-              The ID of the next node to be run next.
-              If source node is of type "parallel split",
-              returns a set of IDs of every next nodes to run next.
-
-        Raises:
-            KeyError: if the src_node_id is not a valid node id.
-            MultipleTransitionError: if several transitions are possible whereas
-              the source node is not a "parallel split" node.
-              TODO: implement priorities, avoiding this error.
-            NoTransitionError: if no transition is possible. Note that this
-              function should not be called for a "stop" node.
-        """
-        if src_node_id not in self._seq_nodes.keys():
-            raise KeyError("Node ID {} is not a valid ID.".format(src_node_id))
-
-        # Get all the transitions that have src_node_id as source
-        candidate_ids = [t_id for t_id, t in self._seq_trans.items()
-                         if t['source'] == src_node_id]
-
-        # Allowed transitions are named 'winners'
-        winner_ids = list()
-
-        # For each candidate, check the condition
-        for cid in candidate_ids:
-            # If transition has no condition, it is immediately a winner
-            if 'condition' not in self._seq_trans[cid]:
-                winner_ids.append(cid)
-            # Else, evaluate the condition of the transition
-            else:
-                cond = self._seq_trans[cid]['condition']
-                # TODO: use Transition.is_condition_fullfilled
-                # If condition is True, then append this transition to winners
-                if cond_res is True:
-                    winner_ids.append(cid)
-
-        # Create the set of target nodes, based on the transition winners
-        target_nodes = set(
-            [t['target'] for t in self._seq_trans.values()
-             if t['id'] in winner_ids])
-
-        # Check to raise NoTransitionError
-        # A node MUST have at least one output transition.
-        if len(target_nodes) == 0:
-            raise NoTransitionError(("Node n°{} does not have any successful "
-                                     "transition.").format(src_node_id))
-
-        # Manage the special case of "parallel_split
-        if self._seq_nodes[src_node_id]['type'] == "parallel_split":
-            return_value = target_nodes
-        else:
-            # Check to raise MultipleTransitionError
-            # If source node is a normal node, it cannot have several
-            # output transitions
-            if len(target_nodes) > 1:
-                raise MultipleTransitionError(
-                    ("Node n°{} has several successful transitions but is "
-                     "not allowed to.").format(src_node_id))
-            else:
-                # Return an int instead of a list
-                # if the source node is not a "parallel split"
-                return_value = target_nodes.pop()
-
-        return return_value
 
     def get_all_node_functions(self) -> Set[str]:
         """Get the name of all the node functions in the sequence.
