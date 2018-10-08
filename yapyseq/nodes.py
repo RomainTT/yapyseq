@@ -125,11 +125,15 @@ class TransitionalNode(Node):
 
         Args:
             nid: the unique ID of the node.
-            transitions: the outgoing transitions of the node.
+            transitions: the outgoing transitions of the node. Each item of the
+              set must be a dictionary with the keys 'target' and 'condition',
+              where 'target' contains the ID of the targeted node, and
+              'condition', the Python expression to assess.
+              'condition' is optional.
             name: (optional) the name of the node.
         """
         super().__init__(nid, name)
-        self._transitions = set([Transition(t['target'], t['condition'])
+        self._transitions = set([Transition(t.get('target'), t.get('condition'))
                                  for t in transitions])
 
     def get_all_next_node_ids(self) -> Set[int]:
@@ -276,21 +280,22 @@ class FunctionNode(SimpleTransitionalNode):
     """Class representing a node of type function."""
 
     def __init__(self, nid: int, function_name: str,
-                 function_kwargs: Dict, transitions: Set,
+                 function_kwargs: Dict = None, transitions: Set,
                  name: str = None, timeout: int = None):
         """Initialize a FunctionNode.
 
         Args:
             nid: the unique ID of the node.
             function_name: the name of the function to run in the node.
-            function_kwargs: the keyword arguments to give to the function.
+            function_kwargs: (optional) the keyword arguments to give
+              to the function.
             transitions: the outgoing transitions of the node.
             name: (optional) the name of the node.
             timeout: (optional) the timeout limit of the function, in seconds.
         """
         super().__init__(nid, transitions, name)
         self._function_name = function_name
-        self._function_kwargs = function_kwargs
+        self._function_kwargs = function_kwargs if function_kwargs else dict()
         self._timeout = timeout
 
     @property
