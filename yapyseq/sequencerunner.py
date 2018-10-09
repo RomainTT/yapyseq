@@ -14,7 +14,7 @@ from queue import Empty as EmptyQueueException
 from enum import Enum
 
 from .functiongrabber import FunctionGrabber
-from .sequenceanalyzer import SequenceAnalyzer
+from .sequencereader import SequenceAnalyzer
 
 # ------------------------------------------------------------------------------
 # Custom exception for this module

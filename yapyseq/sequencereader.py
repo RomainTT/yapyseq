@@ -12,9 +12,10 @@ import yaml
 import yamale
 from collections import Counter
 from typing import Set, Dict
+import copy
 
 from .nodes import StartNode, StopNode, ParallelSplitNode, ParallelSyncNode, \
-    FunctionNode, VariableNode
+    FunctionNode, VariableNode, TransitionalNode
 
 # ------------------------------------------------------------------------------
 # MODULE CONSTANTS
@@ -29,14 +30,13 @@ SEQUENCE_SCHEMA_PATH = "{}/seq_schema.yaml".format(
 # Custom exception for this module
 # ------------------------------------------------------------------------------
 
-
 class SequenceFileError(ImportError):
     pass
+
 
 # ------------------------------------------------------------------------------
 # Main class
 # ------------------------------------------------------------------------------
-
 
 class SequenceReader(object):
     """Class that checks, reads, and extract Nodes from a sequence description.
@@ -89,10 +89,11 @@ class SequenceReader(object):
         with open(self._seq_file_path) as f:
             loaded = yaml.safe_load(f)
 
-        # Collect data into private attributes
-        if ('info' in loaded['sequence'] and
-                'name' in loaded['sequence']['info']):
-            self._seq_name = loaded['sequence']['info']['name']
+        # Collect constants
+        if 'constants' in loaded['sequence']:
+            self._constants = loaded['sequence']['constants']
+        else:
+            self._constants = dict()
 
         # Create node objects
         for node_dict in loaded['sequence']['nodes']:
@@ -199,64 +200,73 @@ class SequenceReader(object):
         # TODO: check compliance between transition IDs and node IDs
         # TODO: check that start nodes do not have IN transitions
 
-    def get_all_nodes(self) -> Dict:
+    def get_nodes(self) -> Dict:
         """Get the instantiated Node objects creating during parsing.
 
         Returns:
             A dictionary where keys are the IDs of the nodes, and values
             are the Node objects (can be different classes in function of the
             node type).
+            A copy of the original is sent, in order to avoid modifications of
+            the original content.
         """
-        return self._nodes
+        return copy.deepcopy(self._nodes)
 
-    def get_all_node_functions(self) -> Set[str]:
+    def get_constants(self) -> Dict:
+        """Get the constants defined in the sequence file.
+
+        Returns:
+            A dictionary where keys are the names of the constants, and values
+            are their values.
+            A copy of the original is sent, in order to avoid modifications of
+            the original content.
+        """
+        return copy.deepcopy(self._constants)
+
+    def get_node_function_names(self) -> Set[str]:
         """Get the name of all the node functions in the sequence.
 
         Returns:
             A set of strings being the names of all the node functions in the
             sequence.
         """
-        function_names = set()
+        return set([n.function_name for n in self._nodes
+                    if type(n) is FunctionNode])
 
-        # Browse nodes
-        for node in self._seq_nodes.values():
-            if node['type'] == 'function':
-                function_names.add(node['function'])
-
-        return function_names
-
-    def get_start_nodes(self):
+    def get_start_node_ids(self):
         """Get the IDs of all the start nodes in the sequence.
 
         Returns:
             A Set of integers being the IDs of the nodes of type 'start'.
         """
-        start_node_ids = set()
+        return set([n.nid for n in self._nodes if type(n) is StartNode])
 
-        # Browse nodes
-        for node_id, node in self._seq_nodes.items():
-            if node["type"] == "start":
-                start_node_ids.add(node_id)
+    def get_prev_node_ids(self, node_id: int) -> Set[int]:
+        """Get the IDs of all the nodes that can lead to the given one.
 
-        return start_node_ids
-
-    def get_all_prev_node_ids(self, node_id: int) -> Set[int]:
-        """Get all the IDs of the nodes that can lead to the given one.
-
-        It will return all the node IDs that have a transition to the given
-        node id, regardless the validity of the transitions. It can be seen as
-        all the possible ancestors of the given node id.
+        It will return the IDs of all the nodes that have a transition to the
+        given node id, regardless the validity of the transitions. It can be
+        seen as all the possible ancestors of the given node id.
 
         Args:
             node_id: the id of the target node.
 
+        Returns:
+            A set of node ids.
+
         Raises:
             KeyError: if the node_id is not a valid node id.
         """
-        if node_id not in self._seq_nodes.keys():
-            raise KeyError("Node ID {} is not a valid ID.".format(node_id))
+        # Initialize the value that will be returned
+        previous_node_ids = set()
 
-        prev_nodes = set([t['source'] for t in self._seq_trans.values()
-                          if t['target'] == node_id])
+        # Browser nodes
+        for node in self._nodes:
+            # Only browse transitional nodes
+            if issubclass(type(node), TransitionalNode):
+                next_nodes = node.get_all_next_node_ids()
+                # If given nid is in the target list, add this previous node
+                if node_id in next_nodes:
+                    previous_node_ids.add(node.nid)
 
-        return prev_nodes
+        return previous_node_ids

@@ -192,7 +192,7 @@ class TransitionalNode(Node):
 class SimpleTransitionalNode(TransitionalNode):
     """Class representing a node that can have only one transition target.
 
-    This king of node can have several transitions, but when they are evaluated
+    This kind of node can have several transitions, but when they are evaluated
     to find the next node, only one transition can win.
     """
 
@@ -280,7 +280,7 @@ class FunctionNode(SimpleTransitionalNode):
     """Class representing a node of type function."""
 
     def __init__(self, nid: int, function_name: str,
-                 function_kwargs: Dict = None, transitions: Set,
+                 transitions: Set, function_kwargs: Dict = None,
                  name: str = None, timeout: int = None):
         """Initialize a FunctionNode.
 

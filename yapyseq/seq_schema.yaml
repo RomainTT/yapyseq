@@ -16,7 +16,7 @@
 ---
 sequence:
 
-  info:
+  constants:
     name: str(required=False)  # name of the sequence
 
   nodes: list(include('function_node'), include('simple_special_node'), include('variable_node'),  required=True)
