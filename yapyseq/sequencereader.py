@@ -72,7 +72,7 @@ class SequenceReader(object):
         # Save the path to the sequence file
         self._seq_file_path = seq_file_path
         # Initialize the set of nodes
-        self._nodes = None
+        self._nodes = set()
 
         # Check the sequence file. Raises an exception if there is an issue.
         self.check_sequence_file(seq_file_path, schema_path)
@@ -146,6 +146,8 @@ class SequenceReader(object):
             # Add the new node to set of nodes in the SequenceReader
             self._nodes.add(new_node)
 
+        # TODO: Set required history for parallel sync node HERE
+
     # --------------------------------------------------------------------------
     # Public methods
     # --------------------------------------------------------------------------
@@ -200,17 +202,29 @@ class SequenceReader(object):
         # TODO: check compliance between transition IDs and node IDs
         # TODO: check that start nodes do not have IN transitions
 
-    def get_nodes(self) -> Dict:
+    def get_nodes(self) -> Set:
         """Get the instantiated Node objects creating during parsing.
 
         Returns:
-            A dictionary where keys are the IDs of the nodes, and values
-            are the Node objects (can be different classes in function of the
-            node type).
+            A Set of Node objects (can be different classes in function of the
+            node type), created during parsing of the sequence file.
             A copy of the original is sent, in order to avoid modifications of
             the original content.
         """
         return copy.deepcopy(self._nodes)
+
+    def get_node_dict(self) -> Dict:
+        """Get a dict of the instantiated Node objects creating during parsing.
+
+        Returns:
+            A dictionary where keys are the IDs of the nodes, and values
+            are the Node objects (can be different classes in function of the
+            node type), created during parsing of the sequence file.
+            A copy of the original is sent, in order to avoid modifications of
+            the original content.
+        """
+        node_dict = dict([(n.nid, n) for n in self._nodes])
+        return copy.deepcopy(node_dict)
 
     def get_constants(self) -> Dict:
         """Get the constants defined in the sequence file.
