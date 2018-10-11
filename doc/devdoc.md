@@ -1,16 +1,17 @@
 # Developer documentation
 
-## Sequences
+### Sequences description
 
 Core data of a sequence is saved in one .yaml file in the directory named 
 `sequences`. The template of one of these .yaml files can be found in 
 `seq_template.yaml`.
 
-### Special nodes
+### Nodes
 
-Some special nodes, managed by yapyseq:
+Here are the different kinds of nodes:
   * start
   * stop
+  * function
   * parallel_split
   * parallel_sync
   * variable
@@ -29,12 +30,12 @@ the parent sequence.
 
 ### Sequence execution management
 
-An instance of `SequenceRunner` runs a new thread to run a node. When the thread
-is ended, it means that the node has finished its action. In that case, the 
-`SequenceRunner` detects it, ask for the next node to the `SequenceAnalyzer` and
-start a new thread for this next node. All kind of output from a node are given
-to the `SequenceRunner` through a shared memory. These outputs can then be used
-for logging, for decision making, can be transferred to other nodes, etc.
+An instance of `SequenceRunner` runs a new thread to run a node of type 
+function. When the thread is ended, it means that the function is over. In that 
+case, the `SequenceRunner` detects it, find the next node, and start a new 
+thread for this next node. All kind of output from a node are given to the 
+`SequenceRunner` through a shared memory (a Queue). These outputs can then be 
+used for logging, for decision making, can be transferred to other nodes, etc.
 At any time, a `SequenceRunner` has an overview of all the nodes that are
 running in its sequence.
 
@@ -109,9 +110,50 @@ List of built-in variables:
                   result.exception.name
                   result.exception.args
 
+## Python expressions in sequence files
+
+There are two types of items in the sequence file for which the string value is
+**always** evaluated as a Python expression:
+  * The condition of the transitions
+  * The variables of a node of type "variable"
+
+It means that these values will be given to the Python built-in function 
+`eval()`.
+
+Unfortunately, yaml automatically removes quotes from values. It means that the
+following yaml code:
+
+    my_key: "my_value"
+
+...is equivalent to the following one:
+
+    my_key: my_value
+
+It means that `eval()` will try to refer to the variable `my_value` instead of
+the string `"my_value"`. In order to give a single string, it must be precised
+in the sequence file, with one of the following syntax:
+
+    my_key: str(my_value)
+    my_key: u"my_value"
+
+
 # Ideas
 
 Set priorities on transitions. Priorities sharing the same source node must have
 unique priorities among them. When evaluating transitions to find the next node,
 priorities can be used to select only one transitions when several are possible.
 Nodes of type "parallel_split" do not need priorities on their transitions.
+
+FOR REFACTOR:
+The SequenceAnalyzer becomes the SequenceReader, it only checks and parses the
+sequence file, to return a dictionary of nodes.
+The SequenceRunner now possesses the main dictionary of nodes, where each key
+is a node id, and values are Node objects (like FunctionNode instance).
+If actions can be written in the nodes themselves rather than in the
+SequenceRunner, it is better. For example, the start of a new process to run 
+a function can be in a public method of FunctionNode.
+In any case, the SequenceRunner is the one that guaranties the right order of
+execution, like a master of orchestra. The SequenceRunner still owns the
+queues to store results. Keeping history, evaluate Python expressions, start
+functions, every one of these actions can be coded in Node classes.
+Sequence variables can still be owned by the SequenceRunner.
