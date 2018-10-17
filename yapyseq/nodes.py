@@ -35,6 +35,9 @@ class ParallelSyncFailure(RuntimeError):
     pass
 
 
+class PreviousNodeUndefined(ReferenceError):
+    pass
+
 # ------------------------------------------------------------------------------
 # Main classes
 # ------------------------------------------------------------------------------
@@ -98,6 +101,7 @@ class Node(object):
         """
         self._nid = nid
         self._name = name
+        self._previous_node_id = None
 
     @property
     def nid(self) -> int:
@@ -111,6 +115,23 @@ class Node(object):
         Name is None if no name has been provided.
         """
         return self._name
+
+    @property
+    def previous_node_id(self):
+        """The saved previous node id of this node.
+
+        Raises:
+            PreviousNodeUndefined: if no previous node is saved.
+        """
+        if self._previous_node_id:
+            return self._previous_node_id
+        else:
+            raise PreviousNodeUndefined("Trying to get the previous node id"
+                                        "but it is unknown...")
+
+    @previous_node_id.setter
+    def previous_node_id(self, value):
+        self._previous_node_id = value
 
 
 class TransitionalNode(Node):
@@ -149,7 +170,7 @@ class TransitionalNode(Node):
         return set([t.target for t in self._transitions])
 
     def get_next_node_id(self, variables: dict) -> Union[int, Set[int]]:
-        """Return the next node to run in function of conditions.
+        """Return the ids of the next node to run in function of conditions.
 
         Transitions will be analyzed, using the given variables to assess
         their conditions, and winning transition(s) will lead to the next
@@ -257,6 +278,10 @@ class ParallelSyncNode(SimpleTransitionalNode):
         """
         self._nodes_to_sync = nids
 
+    def is_sync_initialized(self):
+        """Check if the nodes to sync have been already declared."""
+        return len(self._nodes_to_sync) > 0
+
     def is_sync_complete(self):
         """Check if the synchronization process of this node is complete."""
         if len(self._nodes_to_sync) == 0:
@@ -335,4 +360,7 @@ class VariableNode(SimpleTransitionalNode):
 
     @property
     def variables(self):
+        """Dictionary of variables with python expressions as values."""
         return self._variables
+
+# TODO: SequenceNode

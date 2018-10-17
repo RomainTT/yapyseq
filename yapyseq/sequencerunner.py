@@ -15,6 +15,8 @@ from enum import Enum
 
 from .functiongrabber import FunctionGrabber
 from .sequencereader import SequenceReader
+from .nodes import FunctionNode, StartNode, StopNode, VariableNode, \
+    ParallelSyncNode, ParallelSplitNode
 
 # ------------------------------------------------------------------------------
 # Custom exception for this module
@@ -38,8 +40,7 @@ class ReadOnlyError(ValueError):
 
 
 ExceptInfo = namedtuple("ExceptInfo", "is_raised name args")
-NodeResult = namedtuple("NodeResult", "node_id exception returned")
-NextNode = namedtuple("NextNode", "next_node_id previous_node_id")
+FunctionNodeResult = namedtuple("FunctionNodeResult", "nid exception returned")
 
 
 class SeqRunnerStatus(Enum):
@@ -124,11 +125,11 @@ class SequenceRunner(object):
         # keys are the nids, and values the node objects
         self._nodes = self._seqreader.get_node_dict()
 
-        # Initialize next_nodes as a set of objects of type NextNode.
+        # Initialize new_nodes as a set of objects of type NewNode.
         # At first, new nodes are the start nodes of the sequence.
-        self._next_nodes: Set[NextNode] = set()
+        self._new_nodes = set()
         start_nid = self._seqreader.get_start_node_ids()
-        self._add_next_nodes(start_nid, None)  # previous nodes are None
+        self._add_new_nodes(start_nid, None)  # previous nodes are None
 
         # Initialize running_nodes
         # A dictionary of nodes that are currently running
@@ -140,7 +141,7 @@ class SequenceRunner(object):
 
     @staticmethod
     def _create_node_result(node_id: int, exception: Union[None, Exception],
-                            returned_obj: Any) -> NodeResult:
+                            returned_obj: Any) -> FunctionNodeResult:
         """Return an easy data structure containing result of a node.
 
         Args:
@@ -157,7 +158,7 @@ class SequenceRunner(object):
         else:
             except_info = ExceptInfo(False, None, None)
 
-        res = NodeResult(node_id, except_info, returned_obj)
+        res = FunctionNodeResult(node_id, except_info, returned_obj)
 
         return res
 
@@ -176,7 +177,7 @@ class SequenceRunner(object):
             node_id: The ID of the node containing the function. It is only used
               to be stored in the result object.
             result_queue: The Queue object to store the result of the node
-              function. The stored object will be of type NodeResult.
+              function. The stored object will be of type FunctionNodeResult.
             kwargs: (optional) The arguments to give to the function.
         """
 
@@ -208,7 +209,7 @@ class SequenceRunner(object):
             node_id: The ID of the node containing the function. It is only used
               to be stored in the result object.
             result_queue: The Queue object to store the result of the node
-              function. The stored object will be of type NodeResult.
+              function. The stored object will be of type FunctionNodeResult.
             kwargs: (optional) The arguments to give to the function.
             timeout: (optional) The time limit for the function to be
               terminated.
@@ -249,9 +250,9 @@ class SequenceRunner(object):
                 # Put the final result in the result queue
                 result_queue.put(result)
 
-    def _add_next_nodes(self, next_nodes: Union[int, Set[int]],
-                        previous_node: Union[int, None]) -> None:
-        """Add one or several new nodes to self._next_nodes.
+    def _add_new_nodes(self, new_node_ids: Union[int, Set[int]],
+                       previous_node_id: Union[int, None]) -> None:
+        """Add one or several new nodes to self._new_nodes.
 
         Warning:
             This method should only be used in the run() function of this class,
@@ -259,95 +260,126 @@ class SequenceRunner(object):
             It modifies the internal state of the SequenceRunner object.
 
         Args:
-            next_nodes: The ID or a set of IDs of the new nodes to add.
-            previous_node: the ID of the previous node of the new one.
+            new_node_ids: The ID or a set of IDs of the new nodes to add.
+            previous_node_id: the ID of the previous node of the new one.
         """
-        if type(next_nodes) is int:
-            self._next_nodes.add(NextNode(next_nodes, previous_node))
-        elif type(next_nodes) is set:
-            self._next_nodes.update([NextNode(n, previous_node)
-                                     for n in next_nodes])
+        # Transform the argument into a set if it is not
+        if type(new_node_ids) is not set:
+            new_node_ids = {new_node_ids}
 
-    def _manage_special_node(self, next_node: NextNode) -> None:
-        """Manage a new node not of type 'function' in the running sequence.
+        for new_node_id in new_node_ids:
+            # Get the corresponding node object
+            new_node = self._nodes[new_node_id]
+            # Update the previous node of this node
+            new_node.previous_node_id = previous_node_id
+            # Add this node object to the set of new nodes
+            self._new_nodes.add(new_node)
+
+    def _manage_new_node(self, new_node) -> None:
+        """Manage a new node in the running sequence.
 
         Warning:
             This method should only be used in the run() function of this class.
             It modifies the internal state of the SequenceRunner object.
 
         Args:
-            next_node: the NextNode object which is not of type 'function'.
+            new_node: the node object to process.
 
         Raises:
-            ValueError: if the given next_node is of type 'function'.
             UnknownNodeTypeError: if the given node has an unknown type.
         """
-        node_type = self._seqreader.get_node_type(next_node.node_id)
-        if node_type == 'function':
-            raise ValueError(("This new node (n°{}) is of type 'function'. "
-                              "It should not be given to this "
-                              "function.").format(next_node.node_id))
-
         # If the node is a "start" node, just get the next node
-        if node_type == "start":
-            next_node_id = self._seqreader.get_next_node_id(
-                next_node.node_id,
-                self._variables)
-            self._add_next_nodes(next_node_id, next_node.node_id)
+        if isinstance(new_node, StartNode):
+            new_node_id = new_node.get_next_node_id(self._variables)
+            self._add_new_nodes(new_node_id, None)
 
         # If the node is "stop" node, do nothing
-        elif node_type == "stop":
+        elif isinstance(new_node, StopNode):
             pass
 
         # If the node is a "parallel split", get all next nodes
-        elif node_type == "parallel_split":
-            next_node_ids = self._seqreader.get_next_node_id(
-                next_node.node_id,
-                self._variables)
-            self._add_next_nodes(next_node_ids, next_node.node_id)
+        elif isinstance(new_node, ParallelSplitNode):
+            next_node_ids = new_node.get_next_node_id(self._variables)
+            self._add_new_nodes(next_node_ids, new_node.nid)
 
         # If the node is a "parallel sync"...
-        elif node_type == "parallel_sync":
-            nnid = next_node.node_id  # just to take less space
+        elif isinstance(new_node, ParallelSyncNode):
+            # Initialize this parallel sync node if not already done
+            if not new_node.is_sync_initialized():
+                # This synchronization node must wait for all its
+                # possible previous nodes.
+                new_node.set_nodes_to_sync(
+                    self._seqreader.get_prev_node_ids(new_node.nid))
 
-            # Initialize the history of this parallel_sync
-            # if it does not exist yet
-            if nnid not in self._parallel_sync_history:
-                self._parallel_sync_history[nnid] = set()
-
-            # Add this node to the history
-            self._parallel_sync_history[nnid].add(
-                next_node.previous_node_id)
+            # Update the history with the previous node
+            new_node.add_to_history(new_node.previous_node_id)
 
             # If all transitions met the parallel_sync
             # Get the next node after the parallel_sync
-            prev = self._seqreader.get_all_prev_node_ids(nnid)
-            if prev == self._parallel_sync_history[nnid]:
-                self._parallel_sync_history[nnid].clear()
-                next_node_id = self._seqreader.get_next_node_id(
-                    nnid,
-                    self._variables)
-                self._add_next_nodes(next_node_id, nnid)
+            if new_node.is_sync_complete():
+                new_node.clear_history()
+                new_node_id = new_node.get_next_node_id(self._variables)
+                self._add_new_nodes(new_node_id, new_node.nid)
 
         # If the node is of type 'variable', evaluate expressions
-        elif node_type == "variable":
-            ass = self._seqreader.get_assignations(next_node.node_id)
+        elif isinstance(new_node, VariableNode):
+            var_dict = new_node.variables
             # Do not allow to modify read-only sequence variables
-            inter = self._read_only_var.intersection(set(ass.keys()))
+            inter = self._read_only_var.intersection(set(var_dict.keys()))
             if inter:
                 raise ReadOnlyError(("Node {} tries to modify variables "
                                      "{} but they are read-only variables."
-                                     "").format(next_node.node_id, inter))
+                                     "").format(new_node.nid, inter))
             # Evaluate expression for each variable
-            for var_name, expr in ass.items():
+            for var_name, expr in var_dict.items():
                 if type(expr) is str:
                     value = eval(expr)
                 else:
+                    # If the expression is not an expression but directly
+                    # a value, do not evaluate it.
                     value = expr
+                # Update the writeable sequence variable
                 self._variables[var_name] = value
+        elif isinstance(new_node, FunctionNode):
+            # Start the node function in a separated process
+            func_callable = self._funcgrab.get_function(new_node.function_name)
+            process = mp.Process(
+                target=self._run_node_function_with_timeout,
+                name="Node {}".format(new_node.nid),
+                kwargs={'func': func_callable,
+                        'node_id': new_node.nid,
+                        'result_queue': self._result_queue,
+                        'kwargs': new_node.function_kwargs,
+                        'timeout': new_node.timeout})
+            process.start()
+            # Store this process in the dict of running nodes
+            self._running_nodes[new_node.nid] = process
         else:
-            raise UnknownNodeTypeError("Type of given node is "
-                                       "unknown: {}".format(node_type))
+            raise UnknownNodeTypeError("Type of new node is "
+                                       "unknown: {}".format(type(new_node)))
+
+    def _manage_new_result(self, new_result: FunctionNodeResult):
+        """Manage a new result in the running sequence.
+
+        Warning:
+            This method should only be used in the run() function of this class.
+            It modifies the internal state of the SequenceRunner object.
+
+        Args:
+            new_result: the FunctionNodeResult object.
+
+        """
+        # Save this result into the sequence variables
+        self._variables['results'][new_result.nid] = new_result
+
+        # Remove this node from the running nodes
+        self._running_nodes.pop(new_result.nid)
+
+        # Get the next node according to transitions
+        # and add it to the set of new nodes
+        node_object = self._nodes[new_result.nid]
+        new_node_id = node_object.get_next_node_id(self._variables)
+        self._add_new_nodes(new_node_id, new_result.nid)
 
     # --------------------------------------------------------------------------
     # Public methods
@@ -369,78 +401,38 @@ class SequenceRunner(object):
         self.status = SeqRunnerStatus.RUNNING  # useless if blocking call
 
         # Continue to run the sequence while there are still some nodes to run
-        while self._running_nodes or self._next_nodes:
-            # First of all, analyze new nodes and find nodes to start
-            nodes_to_start = list()
+        while self._running_nodes or self._new_nodes:
 
-            # Create a copy of next_nodes for iterations because
-            # self._next_nodes will be modified inside the for loop
-            next_nodes_iter = self._next_nodes.copy()
-
-            for next_node in next_nodes_iter:
-                # Remove this node from the set
-                self._next_nodes.remove(next_node)
-
-                # Check if this node is a special node
-                node_type = self._seqreader.get_node_type(next_node.node_id)
-                if node_type != "function":
-                    self._manage_special_node(next_node)
-                # If the node is normal, add it to the list of nodes to start
-                else:
-                    nodes_to_start.append(next_node.node_id)
-
-            # Then, start new processes if their are nodes to run
-            for node_id in nodes_to_start:
-                # Get all necessary objects to start the new node
-                node_func_name = self._seqreader.get_function_name(node_id)
-                node_func_call = self._funcgrab.get_function(node_func_name)
-                node_func_args = self._seqreader.get_function_arguments(node_id)
-                node_timeout = self._seqreader.get_node_timeout(node_id)
-
-                # Start the new node in a process
-                process = mp.Process(
-                    target=self._run_node_function_with_timeout,
-                    name="Node {}".format(node_id),
-                    kwargs={'func': node_func_call,
-                            'node_id': node_id,
-                            'result_queue': self._result_queue,
-                            'kwargs': node_func_args,
-                            'timeout': node_timeout})
-                process.start()
-                # Store this process in the dict of running nodes
-                self._running_nodes[node_id] = process
+            # Continue to process all the new nodes until none is left
+            while self._new_nodes:
+                # Retrieve a new node
+                new_node = self._new_nodes.pop()
+                # Do the appropriate action for this new node
+                self._manage_new_node(new_node)
 
             # Finally, if there are some running nodes,
             # just wait for the end of one of them.
-            if not self._next_nodes and self._running_nodes:
+            if self._running_nodes:
                 # A single queue is shared by all threads to provide function
                 # node results. To know when a function node is over the queue
                 # is polled for a result.
-                # The queue provides objects of type NodeResult
+                # The queue provides objects of type FunctionNodeResult
                 new_result = self._result_queue.get()
-
-                # Save this result into the sequence variables
-                self._variables['results'][new_result.node_id] = new_result
-
-                # Remove this node from the running nodes
-                self._running_nodes.pop(new_result.node_id)
-
-                # Get the next node according to transitions
-                next_id = self._seqreader.get_next_node_id(new_result.node_id,
-                                                           self._variables)
-
-                # Add this next node to new nodes,
-                # it will be handled on the next loop iteration
-                self._next_nodes.add(NextNode(next_id, new_result.node_id))
+                # Process the new result
+                self._manage_new_result(new_result)
 
         self.status = SeqRunnerStatus.STOPPED
 
     def pause(self):
+        # TODO
+        raise NotImplemented
         self.status = SeqRunnerStatus.PAUSING
         # Some code...
         self.status = SeqRunnerStatus.PAUSED
 
     def stop(self):
+        # TODO
+        raise NotImplemented
         self.status = SeqRunnerStatus.STOPPING
         # Some code
         self.status = SeqRunnerStatus.STOPPED
