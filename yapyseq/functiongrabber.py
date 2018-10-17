@@ -80,24 +80,29 @@ class FunctionGrabber(object):
             raise FileNotFoundError("No file can be found at"
                                     " {}".format(file_path))
 
-        # Initialize result as an empty list
-        found_func = set()
+        # Create a REGEX pattern to find all functions in the files
+        # This pattern contains all the function names, it will be like
+        # this: "def (func1|func2|func3|)\s*\("
+        # It must be used with re.findall()
+        spattern = "^def ("
+        for func in func_set:
+            spattern = spattern + "{}|".format(func)
+        spattern = spattern + ")\s*\("
+        # pattern must be given in bytes because mmap read bytes
+        bpattern = bytes(spattern, "utf-8")  # files are utf-8
 
         with open(file_path, 'rb', 0) as f:
             # To know why mmap is used, read
             # https://stackoverflow.com/questions/258091/when-should-i-use-mmap-for-file-access
             # https://stackoverflow.com/questions/25268465/using-mmap-to-apply-regexp-to-whole-file-in-python
             with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mfile:
-                # TODO: Find the best way to search for multiple functions in a file
-                # Some timing tests must be done on large files.
-                for func in func_set:
-                    # pattern must be given in bytes because mmap read bytes
-                    spattern = "^def {}\s*\(".format(func)  # create regex
-                    bpattern = bytes(spattern, "utf-8")  # files are utf-8
-                    if re.search(bpattern, mfile, re.MULTILINE):
-                        # Function has been found, append it to result
-                        found_func.add(func)
-        return found_func
+                # Find all functions from the set in one shot
+                found_func = re.findall(bpattern, mfile, re.MULTILINE)
+
+        # Decode binary strings into utf-8
+        found_func = [f.decode('utf-8') for f in found_func]
+
+        return set(found_func)
 
     # --------------------------------------------------------------------------
     # Public methods
