@@ -84,10 +84,10 @@ class FunctionGrabber(object):
         # This pattern contains all the function names, it will be like
         # this: "def (func1|func2|func3|)\s*\("
         # It must be used with re.findall()
-        spattern = "^def ("
+        spattern = r"^def ("
         for func in func_set:
             spattern = spattern + "{}|".format(func)
-        spattern = spattern + ")\s*\("
+        spattern = spattern + r")\s*\("
         # pattern must be given in bytes because mmap read bytes
         bpattern = bytes(spattern, "utf-8")  # files are utf-8
 
