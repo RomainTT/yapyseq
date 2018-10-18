@@ -6,7 +6,7 @@ import pytest
 
 @pytest.fixture
 def seq_dir():
-    return "tests/sequenceanalyzer/sequences/"
+    return "tests/sequencereader/sequences/"
 
 
 @pytest.fixture

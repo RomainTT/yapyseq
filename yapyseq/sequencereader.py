@@ -102,40 +102,40 @@ class SequenceReader(object):
             if ntype == "function":
                 new_node = FunctionNode(
                     nid=node_dict.get('id'),
-                    name=node_dict('name'),
+                    name=node_dict.get('name'),
                     transitions=node_dict.get('transitions'),
                     function_name=node_dict.get('function'),
                     function_kwargs=node_dict.get('arguments'),
-                    timeout=node_dict('timeout'))
+                    timeout=node_dict.get('timeout'))
 
             elif ntype == "start":
                 new_node = StartNode(
                     nid=node_dict.get('id'),
-                    name=node_dict('name'),
+                    name=node_dict.get('name'),
                     transitions=node_dict.get('transitions'))
 
             elif ntype == "stop":
                 new_node = StopNode(
                     nid=node_dict.get('id'),
-                    name=node_dict('name'))
+                    name=node_dict.get('name'))
 
             elif ntype == "variable":
                 new_node = VariableNode(
                     nid=node_dict.get('id'),
-                    name=node_dict('name'),
+                    name=node_dict.get('name'),
                     transitions=node_dict.get('transitions'),
                     variables=node_dict.get('variables'))
 
             elif ntype == "parallel_split":
                 new_node = ParallelSplitNode(
                     nid=node_dict.get('id'),
-                    name=node_dict('name'),
+                    name=node_dict.get('name'),
                     transitions=node_dict.get('transitions'))
 
             elif ntype == "parallel_sync":
                 new_node = ParallelSyncNode(
                     nid=node_dict.get('id'),
-                    name=node_dict('name'),
+                    name=node_dict.get('name'),
                     transitions=node_dict.get('transitions'))
 
             else:

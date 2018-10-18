@@ -1,12 +1,14 @@
 sequence:
 
-  info:
+  constants:
     name: complexity 2
 
   nodes:
     - id: 0
       type: start
       name: start node
+      transitions:
+      - target: 2
 
     - id: 1
       type: stop
@@ -16,6 +18,8 @@ sequence:
       type: function
       name: Dummy node function
       function: dummy_function
+      transitions:
+      - target: 3
 
     - id: 3
       type: function
@@ -24,6 +28,8 @@ sequence:
       arguments:
         spam: 1
         egg: "egg"
+      transitions:
+      - target: 4
 
     - id: 4
       type: function
@@ -33,20 +39,5 @@ sequence:
         spam: 1
         egg: "egg"
       timeout: 10
-
-  transitions:
-    - id: 0
-      source: 0
-      target: 2
-
-    - id: 1
-      source: 2
-      target: 3
-
-    - id: 2
-      source: 3
-      target: 4
-
-    - id: 3
-      source: 4
-      target: 2
+      transitions:
+      - target: 1

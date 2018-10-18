@@ -3,11 +3,11 @@ sequence:
   nodes:
     - id: 0
       type: start
+      transitions:
+      - id: 0
+        target: 1
 
     - id: 1
       type: stop
 
-  transitions:
-    - id: 0
-      source: 0
-      target: 1
+

@@ -4,11 +4,10 @@
 import pytest
 import os
 
-from yapyseq.sequenceanalyzer import *
+from yapyseq.sequencereader import *
 
-
-VALID_SEQ_PATH = "tests/sequenceanalyzer/sequences/valid"
-INVALID_SEQ_PATH = "tests/sequenceanalyzer/sequences/invalid"
+VALID_SEQ_PATH = "tests/sequencereader/sequences/valid"
+INVALID_SEQ_PATH = "tests/sequencereader/sequences/invalid"
 
 
 class TestSequenceAnalyzerInitAndCheck(object):
@@ -21,7 +20,7 @@ class TestSequenceAnalyzerInitAndCheck(object):
         No exception must be raised.
         """
         seq_path = os.path.join(VALID_SEQ_PATH, seq_name)
-        SequenceAnalyzer(seq_path, schema_path)
+        SequenceReader(seq_path, schema_path)
 
     @pytest.mark.parametrize("seq_name",
                              os.listdir(INVALID_SEQ_PATH))
@@ -32,4 +31,4 @@ class TestSequenceAnalyzerInitAndCheck(object):
         """
         seq_path = os.path.join(INVALID_SEQ_PATH, seq_name)
         with pytest.raises(SequenceFileError):
-            SequenceAnalyzer(seq_path, schema_path)
+            SequenceReader(seq_path, schema_path)

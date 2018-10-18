@@ -19,8 +19,11 @@ sequence:
   constants:
     name: str(required=False)  # name of the sequence
 
-  nodes: list(include('function_node'), include('simple_special_node'), include('variable_node'),  required=True)
-
+  nodes: >
+    list(include('function_node'),
+         include('variable_node'),
+         include('stop_node'),
+         include('other_transitional_node'))
 
 # ------------------------------------------------------------------------------
 # Second document contains includes for the first document
@@ -33,18 +36,25 @@ function_node:
   function: str(required=True)  # name of the function to run
   arguments: map(required=False)  # args to give to the function
   timeout: int(required=False)  # timeout of the function, in sec
-  transition: list(include('transition'), required=True)
-
-simple_special_node:
-  type: enum('start', 'stop', 'parallel_split', 'parallel_sync', required=True)
-  id: int(required=True)  # unique id of the node
-  name: str(required=False)  # name of the node
+  transitions: list(include('transition'), required=True)
 
 variable_node:
   type: enum('variable', required=True)
   id: int(required=True)  # unique id of the node
   name: str(required=False)  # name of the node
   variables: map(required=True)  # variables and their assignations
+  transitions: list(include('transition'), required=True)
+
+stop_node:
+  type: enum('stop', required=True)
+  id: int(required=True)  # unique id of the node
+  name: str(required=False)  # name of the node
+
+other_transitional_node:
+  type: enum('start', 'parallel_split', 'parallel_sync', required=True)
+  id: int(required=True)  # unique id of the node
+  name: str(required=False)  # name of the node
+  transitions: list(include('transition'), required=True)
 
 transition:
   target: int(required=True)  # unique id of the target

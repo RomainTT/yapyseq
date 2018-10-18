@@ -1,18 +1,15 @@
 sequence:
 
-  info:
+  constants:
     name: complexity 1
 
   nodes:
     - id: 0
       type: start
       name: start node
+      transitions:
+      - target: 1
 
     - id: 1
       type: stop
       name: stop node
-
-  transitions:
-    - id: 0
-      source: 0
-      target: 1
