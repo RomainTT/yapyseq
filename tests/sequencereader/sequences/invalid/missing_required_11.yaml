@@ -4,6 +4,7 @@ sequence:
     - id: 0
       type: start
       name: start node
+      # Missing transitions
 
     - id: 1
       type: stop
@@ -13,12 +14,5 @@ sequence:
       type: function
       name: Dummy node function
       function: dummy_function
-
-  transitions:
-    - id: 0
-      source: 0
-      # Missing target
-
-    - id: 1
-      source: 2
-      target: 1
+      transitions:
+      - target: 1

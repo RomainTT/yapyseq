@@ -1,0 +1,16 @@
+sequence:
+
+  nodes:
+  - id: 0
+    type: start
+    name: start node
+    transitions:
+    - target: 1
+
+  - id: 1
+    type: stop
+    name: stop node
+
+  - id: 2
+    type: parallel_split
+    # Missing transition

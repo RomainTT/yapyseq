@@ -3,11 +3,8 @@ sequence:
   nodes:
     - id: 0
       type: start
+      transitions:
+      - target: 0
 
     - id: 0  # This is a redundant ID
       type: stop
-
-  transitions:
-    - id: 0
-      source: 0
-      target: 1

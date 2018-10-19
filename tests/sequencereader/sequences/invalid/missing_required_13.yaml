@@ -4,14 +4,15 @@ sequence:
     - id: 0
       type: start
       name: start node
+      transitions:
+      - target: 1
 
     - id: 1
       type: stop
       name: stop node
 
     - id: 2
-      type: function
-      name: Dummy node function
-      function: dummy_function
-
-  # Missing transitions
+      type: variable
+      variables:
+        spam: egg
+      # Missing transition

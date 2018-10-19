@@ -4,21 +4,15 @@ sequence:
     - id: 0
       type: start
       name: start node
+      transitions:
+      - target: 2
 
-    - id: 1
-      type: stop
+    - type: stop
       name: stop node
+      # Missing ID
 
     - id: 2
       type: function
-      name: Dummy node function
       function: dummy_function
-
-  transitions:
-    - id: 0
-      target: 2
-      # Missing source
-
-    - id: 1
-      source: 2
-      target: 1
+      transitions:
+      - target: 1

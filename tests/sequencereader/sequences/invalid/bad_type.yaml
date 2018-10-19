@@ -3,11 +3,8 @@ sequence:
   nodes:
     - id: 0
       type: start
+      transitions:
+      - target: 1
 
     - id: 1
       type: spamegg  # This is a bad type
-
-  transitions:
-    - id: 0
-      source: 0
-      target: 1

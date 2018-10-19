@@ -4,6 +4,8 @@ sequence:
     - id: 0
       type: start
       name: start node
+      transitions:
+      - target: 3  # This is the bad ID
 
     - id: 1
       type: stop
@@ -13,12 +15,5 @@ sequence:
       type: function
       name: Dummy node function
       function: dummy_function
-
-  transitions:
-    - id: 0
-      source: 0
-      target: 2
-
-    - id: 0  # This is a redundant ID
-      source: 2
-      target: 1
+      transitions:
+      - target: 1
