@@ -199,7 +199,23 @@ class SequenceReader(object):
                 "The following ids for nodes are not unique :"
                 " {}".format(*non_unique_ids))
 
-        # TODO: check compliance between transition IDs and node IDs
+        # Check compliance between transition IDs and node IDs
+        for item_id in item_ids:
+            # Check transitions of each node
+            for node in loaded['sequence']['nodes']:
+                if node['id'] == item_id:
+                    if 'transitions' in node:
+                        transitions = node['transitions']
+                        targets = set([t['target'] for t in transitions])
+                    else:
+                        targets = set()
+                    break
+            wrong_ids = targets.difference(set(item_ids))
+            if wrong_ids:
+                raise SequenceFileError(("Node with ID n°{} has a transition"
+                                         " with nonexistent targets:"
+                                         " {}".format(item_id, wrong_ids)))
+
         # TODO: check that start nodes do not have IN transitions
 
     def get_nodes(self) -> Set:
