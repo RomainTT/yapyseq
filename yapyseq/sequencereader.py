@@ -200,23 +200,29 @@ class SequenceReader(object):
                 " {}".format(*non_unique_ids))
 
         # Check compliance between transition IDs and node IDs
-        for item_id in item_ids:
-            # Check transitions of each node
-            for node in loaded['sequence']['nodes']:
-                if node['id'] == item_id:
-                    if 'transitions' in node:
-                        transitions = node['transitions']
-                        targets = set([t['target'] for t in transitions])
-                    else:
-                        targets = set()
-                    break
-            wrong_ids = targets.difference(set(item_ids))
-            if wrong_ids:
-                raise SequenceFileError(("Node with ID n°{} has a transition"
+        # And check that start nodes do not have IN transitions
+        # First, get all the ids of start nodes
+        start_nids = [i['id'] for i in loaded['sequence']['nodes']
+                      if i['type'] == "start"]
+        # Then, browse every node to check its transitions
+        for node in loaded['sequence']['nodes']:
+            if 'transitions' in node:
+                transitions = node['transitions']
+                targets = set([t['target'] for t in transitions])
+            else:
+                targets = set()
+            # Check that the IDs exist
+            wrong_nids = targets.difference(set(item_ids))
+            if wrong_nids:
+                raise SequenceFileError(("Node with ID n°{} has transitions"
                                          " with nonexistent targets:"
-                                         " {}".format(item_id, wrong_ids)))
-
-        # TODO: check that start nodes do not have IN transitions
+                                         " {}".format(node['id'], wrong_nids)))
+            # Check that the target is not a start node
+            wrong_nids = targets.intersection(set(start_nids))
+            if wrong_nids:
+                raise SequenceFileError(("Node with ID n°{} has transitions"
+                                         " leading to start nodes {}"
+                                         "").format(node['id'], wrong_nids))
 
     def get_nodes(self) -> Set:
         """Get the instantiated Node objects creating during parsing.

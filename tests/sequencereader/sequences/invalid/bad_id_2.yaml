@@ -1,0 +1,19 @@
+sequence:
+
+  nodes:
+  - id: 0
+    type: start
+    name: start node
+    transitions:
+    - target: 2
+
+  - id: 1
+    type: stop
+    name: stop node
+
+  - id: 2
+    type: function
+    name: Dummy node function
+    function: dummy_function
+    transitions:
+    - target: 0  # This is the bad ID (leading to start node)
