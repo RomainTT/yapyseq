@@ -30,7 +30,7 @@ SEQUENCE_SCHEMA_PATH = "{}/seq_schema.yaml".format(
 # Custom exception for this module
 # ------------------------------------------------------------------------------
 
-class SequenceFileError(ImportError):
+class SequenceFileError(IOError):
     pass
 
 
@@ -48,7 +48,7 @@ class SequenceReader(object):
     Contents of a sequence file is described in the file `seq_schema.yaml`.
 
     # TODO: implement sub-sequences
-    # TODO: allow transitions to use node names instead of ids
+    # TODO: allow transitions to use node names instead of ids OR remove names and ids can be strings
     """
 
     # --------------------------------------------------------------------------

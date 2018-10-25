@@ -15,10 +15,6 @@ from typing import Union, Set, Dict
 # ------------------------------------------------------------------------------
 
 
-class SequenceFileError(ImportError):
-    pass
-
-
 class MultipleTransitionError(RuntimeError):
     pass
 
