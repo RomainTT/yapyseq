@@ -59,6 +59,7 @@ class TestSequenceReaderParsing(object):
         assert type(n) == FunctionNode
         assert n.nid == 2
         assert n.name == "Dummy node function"
+        assert n.function_name == "dummy_function"
         assert n.get_all_next_node_ids() == {5}
 
         n = node_dict[5]
@@ -78,3 +79,35 @@ class TestSequenceReaderParsing(object):
         assert n.nid == 7
         assert n.get_all_next_node_ids() == {6}
         assert n.variables == {'a': 1, 'b': 2}
+
+    def test_get_node_function_names(self, schema_path):
+        """Test SequenceReader.get_node_function_names."""
+        seq_path = os.path.join(VALID_SEQ_PATH, "complexity_6.yaml")
+        reader = SequenceReader(seq_path, schema_path)
+        func_names = reader.get_node_function_names()
+        assert func_names == {'dummy_function',
+                              'spam_function',
+                              'egg_function'}
+
+    def test_get_start_node_ids(self, schema_path):
+        """Test SequenceReader.get_start_node_ids."""
+        seq_path = os.path.join(VALID_SEQ_PATH, "complexity_6.yaml")
+        reader = SequenceReader(seq_path, schema_path)
+        start_nids = reader.get_start_node_ids()
+        assert start_nids == {0, 8}
+
+    def test_get_prev_node_ids(self, schema_path):
+        """Test SequenceReader.get_prev_node_ids."""
+        seq_path = os.path.join(VALID_SEQ_PATH, "complexity_6.yaml")
+        reader = SequenceReader(seq_path, schema_path)
+        prev_nids = reader.get_prev_node_ids(6)
+        assert prev_nids == {3, 7}
+
+    def test_get_constants(self, schema_path):
+        """Test SequenceReader.get_prev_node_ids."""
+        seq_path = os.path.join(VALID_SEQ_PATH, "complexity_6.yaml")
+        reader = SequenceReader(seq_path, schema_path)
+        constants = reader.get_constants()
+        assert constants == {'name': 'complexity 6',
+                             "one": 1,
+                             "bool": True}

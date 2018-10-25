@@ -159,6 +159,8 @@ class SequenceReader(object):
 
         Given sequence file is checked using given schema to ensure validity
         of the sequence description. Schema must respect YAMALE syntax.
+        # TODO: add description of additional checks
+        # TODO: add check of constant names (must be string)
 
         Args:
             seq_file_path: Path to a YAML file describing a sequence, to check.
