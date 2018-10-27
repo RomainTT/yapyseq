@@ -8,13 +8,15 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import os
-import yaml
-import yamale
 from collections import Counter
 from typing import Set, Dict
 import copy
 
-from .nodes import StartNode, StopNode, ParallelSplitNode, ParallelSyncNode, \
+import yaml
+import yamale
+
+from yapyseq.nodes import StartNode, StopNode, ParallelSplitNode, \
+    ParallelSyncNode, \
     FunctionNode, VariableNode, TransitionalNode
 
 # ------------------------------------------------------------------------------

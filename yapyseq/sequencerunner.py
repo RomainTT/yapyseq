@@ -13,9 +13,9 @@ import multiprocessing as mp
 from queue import Empty as EmptyQueueException
 from enum import Enum
 
-from .functiongrabber import FunctionGrabber
-from .sequencereader import SequenceReader
-from .nodes import FunctionNode, StartNode, StopNode, VariableNode, \
+from yapyseq.functiongrabber import FunctionGrabber
+from yapyseq.sequencereader import SequenceReader
+from yapyseq.nodes import FunctionNode, StartNode, StopNode, VariableNode, \
     ParallelSyncNode, ParallelSplitNode
 
 # ------------------------------------------------------------------------------
