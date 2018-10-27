@@ -1,0 +1,44 @@
+sequence:
+
+  constants:
+    constant: 1
+
+  nodes:
+  - id: 0
+    type: start
+    transitions:
+    - target: 1
+
+  - id: 1
+    type: function
+    function: return_timestamp_after_sleep
+    arguments:
+      sleep_time: 0.1
+    transitions:
+    - target: 2
+      condition: constant == 1  # Check that a variable can be evaluated
+    - target: 4
+      condition: False
+
+  - id: 2
+    type: function
+    function: return_timestamp_after_sleep
+    arguments:
+      sleep_time: 1
+    timeout: 0.5
+    transitions:
+    - target: 3
+      condition: result.exception.is_raised  # check that result is available
+    - target: 4
+      condition: not result.exception.is_raised
+
+  - id: 3
+    type: function
+    function: return_timestamp_after_sleep
+    arguments:
+      sleep_time: 0.1
+    transitions:
+    - target: 4
+
+  - id: 4
+    type: stop

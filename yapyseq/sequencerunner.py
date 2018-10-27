@@ -39,7 +39,7 @@ class ReadOnlyError(ValueError):
 # ------------------------------------------------------------------------------
 
 
-ExceptInfo = namedtuple("ExceptInfo", "is_raised name args")
+ExceptInfo = namedtuple("ExceptInfo", "is_raised name object")
 FunctionNodeResult = namedtuple("FunctionNodeResult", "nid exception returned")
 
 
@@ -81,7 +81,8 @@ class SequenceRunner(object):
     # Private methods
     # --------------------------------------------------------------------------
 
-    def __init__(self, func_dir: str, sequence_path: str, constants: dict):
+    def __init__(self, func_dir: str, sequence_path: str,
+                 constants: dict = None):
         """Initialize the runner with a given sequence.
 
         Args:
@@ -101,12 +102,14 @@ class SequenceRunner(object):
         # and given constants
         self._read_only_var = {'results'}
         self._read_only_var.update(self._seqreader.get_constants())
-        self._read_only_var.update(constants.keys())
+        if constants:
+            self._read_only_var.update(constants.keys())
 
         # Initialize the dictionary of variables.
         # It contains both read-only and writeable variables
         self._variables = dict()
-        self._variables.update(constants)
+        if constants:
+            self._variables.update(constants)
         self._variables.update(self._seqreader.get_constants())
         # Add an empty dict of results in the variables
         # It will be filled with node results while the sequence is running.
@@ -154,7 +157,7 @@ class SequenceRunner(object):
         if exception:
             except_info = ExceptInfo(True,
                                      type(exception).__name__,
-                                     exception.args)
+                                     exception)
         else:
             except_info = ExceptInfo(False, None, None)
 
@@ -333,13 +336,19 @@ class SequenceRunner(object):
             # Evaluate expression for each variable
             for var_name, expr in var_dict.items():
                 if type(expr) is str:
-                    value = eval(expr)
+                    # None is given as globals and variables are given as locals
+                    value = eval(expr, None, self._variables)
                 else:
                     # If the expression is not an expression but directly
                     # a value, do not evaluate it.
                     value = expr
                 # Update the writeable sequence variable
                 self._variables[var_name] = value
+            # Apply transition
+            new_node_id = new_node.get_next_node_id(self._variables)
+            self._add_new_nodes(new_node_id, None)
+
+        # if the node is of type "function", run the function in a process
         elif isinstance(new_node, FunctionNode):
             # Start the node function in a separated process
             func_callable = self._funcgrab.get_function(new_node.function_name)
@@ -436,3 +445,8 @@ class SequenceRunner(object):
         self.status = SeqRunnerStatus.STOPPING
         # Some code
         self.status = SeqRunnerStatus.STOPPED
+
+    @property
+    def variables(self) -> Dict:
+        """Copy of the current sequence variables."""
+        return dict(self._variables)

@@ -1,0 +1,26 @@
+sequence:
+  nodes:
+  - id: 0
+    type: start
+    transitions:
+    - target: 1
+
+  - id: 1
+    type: variable
+    variables:
+      spam: u"egg"
+      number: 1
+      statement: type(1.5) is float
+    transitions:
+    - target: 2
+
+  - id: 2
+    type: variable
+    variables:
+      number: number + 1
+      none: None
+    transitions:
+    - target: 3
+
+  - id: 3
+    type: stop

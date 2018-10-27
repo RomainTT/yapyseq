@@ -1,0 +1,20 @@
+sequence:
+
+  constants:
+    constant: u"Constant value"
+
+  nodes:
+  - id: 0
+    type: start
+    transitions:
+    - target: 1
+
+  - id: 1
+    type: variable
+    variables:
+      constant: u"new value"  # Forbidden
+    transitions:
+    - target: 2
+
+  - id: 2
+    type: stop

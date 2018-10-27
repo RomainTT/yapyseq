@@ -1,0 +1,27 @@
+sequence:
+  nodes:
+  - id: 0
+    type: start
+    transitions:
+    - target: 1
+
+  - id: 1
+    type: function
+    function: return_timestamp_after_sleep
+    arguments:
+      sleep_time: 1
+    timeout: 0.5  # This function will trigger the timeout
+    transitions:
+    - target: 2
+
+  - id: 2
+    type: function
+    function: return_timestamp_after_sleep
+    arguments:
+      sleep_time: 0.5
+    timeout: 1  # This function will not trigger the timeout
+    transitions:
+    - target: 3
+
+  - id: 3
+    type: stop

@@ -16,8 +16,7 @@
 ---
 sequence:
 
-  constants:
-    name: str(required=False)  # name of the sequence
+  constants: map(required=False)
 
   nodes: >
     list(include('function_node'),
@@ -35,7 +34,7 @@ function_node:
   name: str(required=False)  # name of the node
   function: str(required=True)  # name of the function to run
   arguments: map(required=False)  # args to give to the function
-  timeout: int(required=False)  # timeout of the function, in sec
+  timeout: num(required=False)  # timeout of the function, in sec
   transitions: list(include('transition'), required=True)
 
 variable_node:

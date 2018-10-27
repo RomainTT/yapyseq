@@ -173,6 +173,7 @@ class TransitionalNode(Node):
         nodes(s).
 
         TODO: implement priorities among transitions
+        TODO: implement the 'else' in conditions
 
         Args:
             variables: dictionary that contains all the variables that the
