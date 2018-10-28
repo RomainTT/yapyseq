@@ -69,7 +69,8 @@ class TestSequenceReaderInitAndCheck(object):
 
     @pytest.mark.parametrize("seq_file,nid_range",
                              [("multiple_function_nodes.yaml", (1, 3)),
-                              ("simple_parallel.yaml", (2, 5))])
+                              ("simple_parallel.yaml", (2, 5)),
+                              ("multiple_parallel.yaml", (2, 6))])
     def test_execution_order(self, func_dir, seq_dir, seq_file, nid_range):
         """Check that a sequence is running in the right order."""
         sequence = os.path.join(seq_dir, seq_file)

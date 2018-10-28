@@ -1,0 +1,74 @@
+sequence:
+  nodes:
+  - id: 0
+    type: start
+    transitions:
+    - target: 10
+
+  - id: 10
+    type: parallel_split
+    transitions:
+    - target: 1
+    - target: 11
+
+  - id: 1
+    type: function
+    function: return_timestamp_after_sleep
+    arguments:
+      sleep_time: 0  # 1st node to return its timestamp
+    transitions:
+    - target: 4
+
+  - id: 4
+    type: function
+    function: return_timestamp_after_sleep
+    arguments:
+      sleep_time: 1.5 # 4th node to return its timestamp
+    transitions:
+    - target: 9
+
+  - id: 11
+    type: parallel_split
+    transitions:
+      - target: 2
+      - target: 3
+
+  - id: 2
+    type: function
+    function: return_timestamp_after_sleep
+    arguments:
+      sleep_time: 0.5 # 2nd node to return its timestamp
+    transitions:
+    - target: 5
+
+  - id: 5
+    type: function
+    function: return_timestamp_after_sleep
+    arguments:
+      sleep_time: 2 # 5th node to return its timestamp
+    transitions:
+    - target: 9
+
+  - id: 3
+    type: function
+    function: return_timestamp_after_sleep
+    arguments:
+      sleep_time: 1 # 3rd node to return its timestamp
+    transitions:
+    - target: 6
+
+  - id: 6
+    type: function
+    function: return_timestamp_after_sleep
+    arguments:
+      sleep_time: 2.5 # 6th node to return its timestamp
+    transitions:
+    - target: 9
+
+  - id: 9
+    type: parallel_sync
+    transitions:
+    - target: 12
+
+  - id: 12
+    type: stop
