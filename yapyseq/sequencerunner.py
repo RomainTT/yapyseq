@@ -448,5 +448,5 @@ class SequenceRunner(object):
 
     @property
     def variables(self) -> Dict:
-        """Copy of the current sequence variables."""
+        """Copy of the current sequence variables (read-only)."""
         return dict(self._variables)

@@ -18,7 +18,7 @@ sequence:
     - target: 2
       condition: constant == 1  # Check that a variable can be evaluated
     - target: 4
-      condition: False
+      condition: "False"
 
   - id: 2
     type: function
@@ -28,9 +28,9 @@ sequence:
     timeout: 0.5
     transitions:
     - target: 3
-      condition: result.exception.is_raised  # check that result is available
+      condition: results[2].exception.is_raised
     - target: 4
-      condition: not result.exception.is_raised
+      condition: not results[2].exception.is_raised
 
   - id: 3
     type: function
