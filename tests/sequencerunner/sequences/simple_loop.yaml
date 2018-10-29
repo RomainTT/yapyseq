@@ -1,0 +1,35 @@
+sequence:
+  nodes:
+  - id: 0
+    type: start
+    transitions:
+    - target: 1
+
+  - id: 1
+    type: variable
+    variables:
+      counter: 10
+    transitions:
+    - target: 2
+
+  - id: 2
+    type: function
+    function: write_arg_in_file
+    arguments:
+      arg: counter
+      file: u"tests/sequencerunner/loop_file.txt"
+    transitions:
+    - target: 3
+
+  - id: 3
+    type: variable
+    variables:
+      counter: counter - 1
+    transitions:
+    - target: 2
+      condition: counter > 0
+    - target: 4
+      condition: counter == 0
+
+  - id: 4
+    type: stop

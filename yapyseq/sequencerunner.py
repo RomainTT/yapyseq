@@ -142,6 +142,26 @@ class SequenceRunner(object):
         # Update status
         self.status = SeqRunnerStatus.INITIALIZED
 
+    def _evaluate_expr(self, expr: Any) -> Any:
+        """Evaluate a Python expression knowing the sequence variables.
+
+        Args:
+            expr: a string with a Python expression
+              or a directly a Python object if not an expression.
+
+        Returns:
+            The value of the evaluated expression, or the object itself if it is
+            not an expression.
+        """
+        if type(expr) is str:
+            # None is given as globals and variables are given as locals
+            value = eval(expr, None, self._variables)
+        else:
+            # If the expression is not an expression but directly
+            # a value, do not evaluate it.
+            value = expr
+        return value
+
     @staticmethod
     def _create_node_result(node_id: int, exception: Union[None, Exception],
                             returned_obj: Any) -> FunctionNodeResult:
@@ -335,13 +355,7 @@ class SequenceRunner(object):
                                      "").format(new_node.nid, inter))
             # Evaluate expression for each variable
             for var_name, expr in var_dict.items():
-                if type(expr) is str:
-                    # None is given as globals and variables are given as locals
-                    value = eval(expr, None, self._variables)
-                else:
-                    # If the expression is not an expression but directly
-                    # a value, do not evaluate it.
-                    value = expr
+                value = self._evaluate_expr(expr)
                 # Update the writeable sequence variable
                 self._variables[var_name] = value
             # Apply transition
@@ -350,15 +364,20 @@ class SequenceRunner(object):
 
         # if the node is of type "function", run the function in a process
         elif isinstance(new_node, FunctionNode):
-            # Start the node function in a separated process
+            # First, fetch the callable
             func_callable = self._funcgrab.get_function(new_node.function_name)
+            # And evaluate the kwargs in case there are some variables in it
+            evaluated_kwargs = {}
+            for key, val in new_node.function_kwargs.items():
+                evaluated_kwargs[key] = self._evaluate_expr(val)
+            # Finally, create a new Process to run this function
             process = mp.Process(
                 target=self._run_node_function_with_timeout,
                 name="Node {}".format(new_node.nid),
                 kwargs={'func': func_callable,
                         'node_id': new_node.nid,
                         'result_queue': self._result_queue,
-                        'kwargs': new_node.function_kwargs,
+                        'kwargs': evaluated_kwargs,
                         'timeout': new_node.timeout})
             process.start()
             # Store this process in the dict of running nodes

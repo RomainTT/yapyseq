@@ -2,6 +2,7 @@
 # coding: utf-8
 
 from time import sleep, time
+from typing import Any
 
 
 def return_timestamp_after_sleep(sleep_time: int) -> float:
@@ -11,3 +12,8 @@ def return_timestamp_after_sleep(sleep_time: int) -> float:
 
 def return_hello_world() -> str:
     return "Hello world!"
+
+
+def write_arg_in_file(arg: Any, file: str) -> None:
+    with open(file, 'a') as f:
+        f.write("{}\n".format(arg))

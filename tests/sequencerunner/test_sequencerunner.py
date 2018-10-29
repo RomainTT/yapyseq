@@ -7,7 +7,7 @@ import os
 from yapyseq.sequencerunner import *
 
 
-class TestSequenceReaderInitAndCheck(object):
+class TestSequenceRunner(object):
 
     def test_user_constants(self, func_dir, seq_dir):
         """Check that constants written in sequence file are correctly stored
@@ -80,3 +80,18 @@ class TestSequenceReaderInitAndCheck(object):
         assert all(nid in results for nid in nid_range)
         for nid in range(*nid_range):
             assert results[nid].returned < results[nid + 1].returned
+
+    def test_simple_loop(self, func_dir, seq_dir):
+        """Check that a simple loop can be achieved."""
+        result_file = "tests/sequencerunner/loop_file.txt"
+        sequence = os.path.join(seq_dir, "simple_loop.yaml")
+        runner = SequenceRunner(func_dir, sequence)
+        runner.run()
+        # Check the output file
+        with open(result_file, 'r') as f:
+            lines = f.readlines()
+        os.remove(result_file)
+        lines = [l.strip('\n') for l in lines]
+        # Lines should contain numbers from 1 to 10
+        for i in range(1, 11):
+            assert lines.pop() == str(i)
