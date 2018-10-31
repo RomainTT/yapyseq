@@ -7,16 +7,14 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
-from collections import namedtuple
-from typing import Callable, Dict, Set, Union, Any
+from typing import Dict, Set, Union, Any
 import multiprocessing as mp
-from queue import Empty as EmptyQueueException
 from enum import Enum
 
 from yapyseq.functiongrabber import FunctionGrabber
 from yapyseq.sequencereader import SequenceReader
 from yapyseq.nodes import FunctionNode, StartNode, StopNode, VariableNode, \
-    ParallelSyncNode, ParallelSplitNode
+    ParallelSyncNode, ParallelSplitNode, FunctionNodeResult
 
 # ------------------------------------------------------------------------------
 # Custom exception for this module
@@ -24,10 +22,6 @@ from yapyseq.nodes import FunctionNode, StartNode, StopNode, VariableNode, \
 
 
 class UnknownNodeTypeError(ValueError):
-    pass
-
-
-class NodeFunctionTimeout(TimeoutError):
     pass
 
 
@@ -39,10 +33,6 @@ class ReadOnlyError(ValueError):
 # ------------------------------------------------------------------------------
 
 
-ExceptInfo = namedtuple("ExceptInfo", "is_raised name object")
-FunctionNodeResult = namedtuple("FunctionNodeResult", "nid exception returned")
-
-
 class SeqRunnerStatus(Enum):
     RUNNING = 0
     PAUSING = 1
@@ -50,7 +40,6 @@ class SeqRunnerStatus(Enum):
     STOPPING = 3
     STOPPED = 4
     INITIALIZED = 5
-
 
 # ------------------------------------------------------------------------------
 # Main class
@@ -162,117 +151,6 @@ class SequenceRunner(object):
             value = expr
         return value
 
-    @staticmethod
-    def _create_node_result(node_id: int, exception: Union[None, Exception],
-                            returned_obj: Any) -> FunctionNodeResult:
-        """Return an easy data structure containing result of a node.
-
-        Args:
-            exception: the exception object if the function raised one.
-            returned_obj: the returned object if the function returned one.
-
-        Returns:
-            A nametuple containing all the given data in a structured form.
-        """
-        if exception:
-            except_info = ExceptInfo(True,
-                                     type(exception).__name__,
-                                     exception)
-        else:
-            except_info = ExceptInfo(False, None, None)
-
-        res = FunctionNodeResult(node_id, except_info, returned_obj)
-
-        return res
-
-    @staticmethod
-    def _run_node_function_no_timeout(func: Callable, node_id: int,
-                                      result_queue: mp.Queue,
-                                      kwargs: Dict = None) -> None:
-        """Function that can be called in a thread to run a node function.
-
-        This function must:
-          * Run the given callable that has been given, with the given arguments
-          * Provide the result of the callable through a Queue
-
-        Args:
-            func: The function to be run. Must be a callable.
-            node_id: The ID of the node containing the function. It is only used
-              to be stored in the result object.
-            result_queue: The Queue object to store the result of the node
-              function. The stored object will be of type FunctionNodeResult.
-            kwargs: (optional) The arguments to give to the function.
-        """
-
-        # Run the callable
-        try:
-            func_res = func(**kwargs)
-        except Exception as e:
-            res = SequenceRunner._create_node_result(node_id, e, None)
-        else:
-            res = SequenceRunner._create_node_result(node_id, None, func_res)
-
-        # Provide result through the Queue
-        result_queue.put(res)
-
-    @staticmethod
-    def _run_node_function_with_timeout(func: Callable, node_id: int,
-                                        result_queue: mp.Queue,
-                                        kwargs: Dict = None,
-                                        timeout: int = None) -> None:
-        """Function that can be called in a thread to run a node function.
-
-        This function must:
-          * Run the given callable that has been given, with the given arguments
-          * Manage a Timeout on this callable
-          * Provide the result of the callable through a Queue
-
-        Args:
-            func: The function to be run. Must be a callable.
-            node_id: The ID of the node containing the function. It is only used
-              to be stored in the result object.
-            result_queue: The Queue object to store the result of the node
-              function. The stored object will be of type FunctionNodeResult.
-            kwargs: (optional) The arguments to give to the function.
-            timeout: (optional) The time limit for the function to be
-              terminated.
-        """
-        if not timeout:
-            # Just start the function without timeout
-            # and without creating a new thread.
-            # Note: this separate condition could be avoided because Queue.get
-            # manages a None timeout, but this implementation avoids creating
-            # unnecessary sub-threads, so it is better like this !
-            SequenceRunner._run_node_function_no_timeout(
-                func, node_id, result_queue, kwargs)
-        else:
-            # Create a sub-result queue for the real run of the function
-            sub_result_queue = mp.Queue()
-            # Start the function in the new sub-thread
-            process = mp.Process(
-                target=SequenceRunner._run_node_function_no_timeout,
-                name="Node {} sub-thread".format(node_id),
-                kwargs={'func': func,
-                        'node_id': node_id,
-                        'result_queue': sub_result_queue,
-                        'kwargs': kwargs})
-            process.start()
-            result = None  # Just in case something goes wrong in try except
-            try:
-                # Wait until result or timeout
-                result = sub_result_queue.get(block=True, timeout=timeout)
-            except EmptyQueueException:
-                # timeout occurred !
-                # Create a timeout exception to put in the result
-                exception = NodeFunctionTimeout(
-                    "Function {} of node {} timed out !".format(func.__name__,
-                                                                node_id))
-                result = SequenceRunner._create_node_result(
-                    node_id, exception, None)
-            finally:
-                # Put the final result in the result queue
-                result_queue.put(result)
-
     def _add_new_nodes(self, new_node_ids: Union[int, Set[int]],
                        previous_node_id: Union[int, None]) -> None:
         """Add one or several new nodes to self._new_nodes.
@@ -372,7 +250,7 @@ class SequenceRunner(object):
                 evaluated_kwargs[key] = self._evaluate_expr(val)
             # Finally, create a new Process to run this function
             process = mp.Process(
-                target=self._run_node_function_with_timeout,
+                target=FunctionNode._run_function_with_timeout,
                 name="Node {}".format(new_node.nid),
                 kwargs={'func': func_callable,
                         'node_id': new_node.nid,
@@ -386,8 +264,9 @@ class SequenceRunner(object):
             raise UnknownNodeTypeError("Type of new node is "
                                        "unknown: {}".format(type(new_node)))
 
-    def _manage_new_result(self, new_result: FunctionNodeResult):
-        """Manage a new result in the running sequence.
+    def _manage_new_function_result(self,
+                                    new_result: FunctionNodeResult):
+        """Manage a new result of FunctionNode in the running sequence.
 
         Warning:
             This method should only be used in the run() function of this class.
@@ -447,7 +326,7 @@ class SequenceRunner(object):
                 # The queue provides objects of type FunctionNodeResult
                 new_result = self._result_queue.get()
                 # Process the new result
-                self._manage_new_result(new_result)
+                self._manage_new_function_result(new_result)
 
         self.status = SeqRunnerStatus.STOPPED
 

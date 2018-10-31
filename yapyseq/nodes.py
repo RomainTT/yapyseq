@@ -7,8 +7,18 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
-from typing import Union, Set, Dict
+from typing import Callable, Union, Set, Dict, Any
+from collections import namedtuple
+import multiprocessing as mp
+from queue import Empty as EmptyQueueException
 
+# ------------------------------------------------------------------------------
+# Custom types for this module
+# ------------------------------------------------------------------------------
+
+ExceptInfo = namedtuple("ExceptInfo", "is_raised name object")
+FunctionNodeResult = namedtuple("FunctionNodeResult",
+                                "nid exception returned")
 
 # ------------------------------------------------------------------------------
 # Custom exception for this module
@@ -32,6 +42,10 @@ class ParallelSyncFailure(RuntimeError):
 
 
 class PreviousNodeUndefined(ReferenceError):
+    pass
+
+
+class NodeFunctionTimeout(TimeoutError):
     pass
 
 # ------------------------------------------------------------------------------
@@ -336,6 +350,118 @@ class FunctionNode(SimpleTransitionalNode):
 
         Timeout is None if no timeout has been provided."""
         return self._timeout
+
+    @staticmethod
+    def _create_node_result(node_id: int, exception: Union[None, Exception],
+                            returned_obj: Any) -> FunctionNodeResult:
+        """Return an easy data structure containing result of a node.
+
+        Args:
+            exception: the exception object if the function raised one.
+            returned_obj: the returned object if the function returned one.
+
+        Returns:
+            A namedtuple containing all the given data in a structured form.
+        """
+        if exception:
+            except_info = ExceptInfo(True,
+                                     type(exception).__name__,
+                                     exception)
+        else:
+            except_info = ExceptInfo(False, None, None)
+
+        res = FunctionNodeResult(node_id,
+                                 except_info,
+                                 returned_obj)
+        return res
+
+    @staticmethod
+    def _run_function_no_timeout(func: Callable, node_id: int,
+                                 result_queue: mp.Queue,
+                                 kwargs: Dict = None) -> None:
+        """Function that can be called in a thread to run a node function.
+
+        This function does:
+          * Run the given callable that has been given, with the given arguments
+          * Provide the result of the callable through a Queue
+
+        Args:
+            func: The function to be run. Must be a callable.
+            node_id: The ID of the node containing the function. It is only used
+              to be stored in the result object.
+            result_queue: The Queue object to store the result of the node
+              function. The stored object will be of type FunctionNodeResult.
+            kwargs: (optional) The arguments to give to the function.
+        """
+
+        # Run the callable
+        try:
+            func_res = func(**kwargs)
+        except Exception as e:
+            res = FunctionNode._create_node_result(node_id, e, None)
+        else:
+            res = FunctionNode._create_node_result(node_id, None, func_res)
+
+        # Provide result through the Queue
+        result_queue.put(res)
+
+    @staticmethod
+    def _run_function_with_timeout(func: Callable, node_id: int,
+                                   result_queue: mp.Queue,
+                                   kwargs: Dict = None,
+                                   timeout: int = None) -> None:
+        """Function that can be called in a thread to run a node function.
+
+        This function does:
+          * Run the given callable that has been given, with the given arguments
+          * Manage a Timeout on this callable
+          * Provide the result of the callable through a Queue
+
+        Args:
+            func: The function to be run. Must be a callable.
+            node_id: The ID of the node containing the function. It is only used
+              to be stored in the result object.
+            result_queue: The Queue object to store the result of the node
+              function. The stored object will be of type FunctionNodeResult.
+            kwargs: (optional) The arguments to give to the function.
+            timeout: (optional) The time limit for the function to be
+              terminated.
+        """
+        if not timeout:
+            # Just start the function without timeout
+            # and without creating a new thread.
+            # Note: this separate condition could be avoided because Queue.get
+            # manages a None timeout, but this implementation avoids creating
+            # unnecessary sub-threads, so it is better like this !
+            FunctionNode._run_function_no_timeout(
+                func, node_id, result_queue, kwargs)
+        else:
+            # Create a sub-result queue for the real run of the function
+            sub_result_queue = mp.Queue()
+            # Start the function in the new sub-thread
+            process = mp.Process(
+                target=FunctionNode._run_function_no_timeout,
+                name="Node {} sub-thread".format(node_id),
+                kwargs={'func': func,
+                        'node_id': node_id,
+                        'result_queue': sub_result_queue,
+                        'kwargs': kwargs})
+            process.start()
+            result = None  # Just in case something goes wrong in try except
+            try:
+                # Wait until result or timeout
+                result = sub_result_queue.get(block=True, timeout=timeout)
+            except EmptyQueueException:
+                # timeout occurred !
+                # Create a timeout exception to put in the result
+                exception = NodeFunctionTimeout(
+                    "Function {} of node {} timed out !".format(func.__name__,
+                                                                node_id))
+                result = FunctionNode._create_node_result(
+                    node_id, exception, None)
+            finally:
+                # Put the final result in the result queue
+                result_queue.put(result)
 
 
 class VariableNode(SimpleTransitionalNode):

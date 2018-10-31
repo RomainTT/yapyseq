@@ -5,6 +5,7 @@ import pytest
 import os
 
 from yapyseq.sequencerunner import *
+from yapyseq.nodes import NodeFunctionTimeout
 
 
 class TestSequenceRunner(object):
