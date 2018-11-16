@@ -74,7 +74,7 @@ class FunctionGrabber(object):
 
         Raises:
             FileNotFoundError: if file_path lead to no real file.
-            IOError: if file cannot be read.
+            OSError: if file cannot be read.
         """
         if not os.path.isfile(file_path):
             raise FileNotFoundError("No file can be found at"

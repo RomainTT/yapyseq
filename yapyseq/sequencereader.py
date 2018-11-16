@@ -32,7 +32,7 @@ SEQUENCE_SCHEMA_PATH = "{}/seq_schema.yaml".format(
 # Custom exception for this module
 # ------------------------------------------------------------------------------
 
-class SequenceFileError(IOError):
+class SequenceFileError(OSError):
     pass
 
 
@@ -170,7 +170,7 @@ class SequenceReader(object):
 
         Raises:
             FileNotFoundError: if the given path does not lead to a file.
-            IOError: if the file cannot be read.
+            OSError: if the file cannot be read.
             SequenceFileError: if format of sequence does not respect the rules.
              See `seq_schema.yaml`.
             Same as `yamale.validate` in case it raises others than ValueError
