@@ -1,4 +1,4 @@
-# Developer documentation
+# Yapyseq developer documentation
 
 ### Sequences description
 
