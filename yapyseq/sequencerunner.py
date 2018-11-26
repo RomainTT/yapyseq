@@ -70,7 +70,7 @@ class SequenceRunner(object):
     # Private methods
     # --------------------------------------------------------------------------
 
-    def __init__(self, func_dir: str, sequence_path: str,
+    def __init__(self, sequence_path: str, func_dir: str,
                  constants: dict = None):
         """Initialize the runner with a given sequence.
 

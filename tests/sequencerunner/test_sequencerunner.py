@@ -16,7 +16,7 @@ class TestSequenceRunner(object):
         """
         sequence = os.path.join(seq_dir, "one_function_node.yaml")
         constants = {'spam': 'egg'}
-        runner = SequenceRunner(func_dir, sequence, constants)
+        runner = SequenceRunner(sequence, func_dir, constants)
         assert runner.variables['spam'] == 'egg'
 
     def test_one_function_node(self, func_dir, seq_dir):
@@ -24,7 +24,7 @@ class TestSequenceRunner(object):
            correctly.
         """
         sequence = os.path.join(seq_dir, "one_function_node.yaml")
-        runner = SequenceRunner(func_dir, sequence)
+        runner = SequenceRunner(sequence, func_dir)
         runner.run()
         node_result = runner.variables['results'][1]
         assert node_result.nid == 1
@@ -34,7 +34,7 @@ class TestSequenceRunner(object):
     def test_multiple_variable_nodes(self, func_dir, seq_dir):
         """Check that variable nodes correctly update the sequence variables."""
         sequence = os.path.join(seq_dir, "multiple_variable_nodes.yaml")
-        runner = SequenceRunner(func_dir, sequence)
+        runner = SequenceRunner(sequence, func_dir)
         runner.run()
         variables = runner.variables
         assert variables['spam'] == 'egg'
@@ -45,14 +45,14 @@ class TestSequenceRunner(object):
     def test_readonly(self, func_dir, seq_dir):
         """Check that a constant cannot be updated in the sequence."""
         sequence = os.path.join(seq_dir, "readonly.yaml")
-        runner = SequenceRunner(func_dir, sequence)
+        runner = SequenceRunner(sequence, func_dir)
         with pytest.raises(ReadOnlyError):
             runner.run()
 
     def test_timeout(self, func_dir, seq_dir):
         """Test the timeout feature of function nodes."""
         sequence = os.path.join(seq_dir, "timeout.yaml")
-        runner = SequenceRunner(func_dir, sequence)
+        runner = SequenceRunner(sequence, func_dir)
         runner.run()
         results = runner.variables['results']
         assert results[1].exception.is_raised is True
@@ -61,7 +61,7 @@ class TestSequenceRunner(object):
 
     def test_conditional_transitions(self, func_dir, seq_dir):
         sequence = os.path.join(seq_dir, "multiple_function_nodes.yaml")
-        runner = SequenceRunner(func_dir, sequence)
+        runner = SequenceRunner(sequence, func_dir)
         runner.run()
         results = runner.variables['results']
         assert all(nid in results for nid in [1, 2, 3])
@@ -75,7 +75,7 @@ class TestSequenceRunner(object):
     def test_execution_order(self, func_dir, seq_dir, seq_file, nid_range):
         """Check that a sequence is running in the right order."""
         sequence = os.path.join(seq_dir, seq_file)
-        runner = SequenceRunner(func_dir, sequence)
+        runner = SequenceRunner(sequence, func_dir)
         runner.run()
         results = runner.variables['results']
         assert all(nid in results for nid in nid_range)
@@ -86,7 +86,7 @@ class TestSequenceRunner(object):
         """Check that a simple loop can be achieved."""
         result_file = "tests/sequencerunner/loop_file.txt"
         sequence = os.path.join(seq_dir, "simple_loop.yaml")
-        runner = SequenceRunner(func_dir, sequence)
+        runner = SequenceRunner(sequence, func_dir)
         runner.run()
         # Check the output file
         with open(result_file, 'r') as f:
