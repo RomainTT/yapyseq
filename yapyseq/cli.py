@@ -49,12 +49,28 @@ def check(sequence_file):
 @yapyseq_main_cli.command()
 @click.argument('sequence_file', type=click.Path(exists=True))
 @click.argument('function_dir', type=click.Path(exists=True))
-def run(sequence_file, function_dir):
+@click.option('--constant', '-c', multiple=True, type=(str, str, str),
+              help=('NAME TYPE VALUE. '
+                    'Type must be a valid python built-in type.'))
+def run(sequence_file, function_dir, constant):
     """Run a sequence.
 
     SEQUENCE_FILE is the path to the sequence file to check.
     FUNCTION_DIR is the path to the directory containing Python files
     and functions referenced by the sequence.
+
+    As many constants as wanted can be given. For each constant, you must give
+    the name, the type and the value. Example: -c var_name bool True
     """
-    runner = SequenceRunner(function_dir, sequence_file)
+    constant_dict = {}
+    available_types = ['str', 'float', 'int', 'bool']
+    # Evaluate every constant value
+    for c in constant:
+        if c[1] not in available_types:
+            raise click.BadOptionUsage(
+                option_name='--constant',
+                message='Constant type must be in {}'.format(available_types))
+        constant_dict[c[0]] = eval('{}("{}")'.format(c[1], c[2]))
+
+    runner = SequenceRunner(sequence_file, function_dir)
     runner.run(blocking=True)
