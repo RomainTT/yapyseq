@@ -1,10 +1,8 @@
 # Yapyseq developer documentation
 
-### Sequences description
+## Internal architecture
 
-Core data of a sequence is saved in one .yaml file in the directory named 
-`sequences`. The template of one of these .yaml files can be found in 
-`seq_template.yaml`.
+TODO
 
 ### Nodes
 
@@ -68,48 +66,6 @@ of the synchronization. The synchronization will be stuck and never be done.
 This kind of sequence is hardly detectable (but not impossible) by yapyseq. User
 must be aware of this danger.
 
-### Sequence variables of a sequence
-
-A sequence can hold a certain amount of variables possesses by the 
-`SequenceRunner`. These variables can only be referenced in the sequence file.
-Node functions cannot use them directly, but some sequence variables can be 
-given to them through arguments. Only copies of variables are given to functions
-not references themselves to prevent conflicting accesses to a same variables.
-
-Sequence variables are fully managed by the `SequenceRunner`: creation,
-transfer, deletion, update. This avoids access conflicts to sequences
-variables, because there is only one thread which modifies them: the thread
-of the `SequenceRunner`.
-
-There are different kinds of sequence variables:
-  * Built-in variables, created and managed by yapyseq. For instance, the return
-    value of nodes. They are read-only for users.
-  * User constants, defined in the sequence file or given by user when he
-    runs the sequence. For instance, a comment about the run. They are read-only
-    for users.
-  * On-the-fly variables, created during the run of the sequence, for instance
-    to manage loop counts. These variables are managed in special nodes of type
-    `variable`. In these nodes, a dictionary is given to create/update the
-    variables. In this dictionary, keys are the name of the variables and values
-    are Python statements that will be evaluated and stored in their
-    corresponding variable. These special nodes do not allow to modify built-in
-    variables and user constants.
-    
-All of these variables can be used in conditions of transitions.
-
-List of built-in variables:
-  * returns: Return values of every nodes (last run only)
-      A dedicated data structure is used to store the result of a node function.
-      It contains the exception if it raised one, and the return object.
-      Datastructure:
-        
-          result
-              result.returned
-              result.exception
-                  result.exception.is_raised
-                  result.exception.name
-                  result.exception.args
-
 ## Python expressions in sequence files
 
 There are two types of items in the sequence file for which the string value is
@@ -143,17 +99,3 @@ Set priorities on transitions. Priorities sharing the same source node must have
 unique priorities among them. When evaluating transitions to find the next node,
 priorities can be used to select only one transitions when several are possible.
 Nodes of type "parallel_split" do not need priorities on their transitions.
-
-FOR REFACTOR:
-The SequenceAnalyzer becomes the SequenceReader, it only checks and parses the
-sequence file, to return a dictionary of nodes.
-The SequenceRunner now possesses the main dictionary of nodes, where each key
-is a node id, and values are Node objects (like FunctionNode instance).
-If actions can be written in the nodes themselves rather than in the
-SequenceRunner, it is better. For example, the start of a new process to run 
-a function can be in a public method of FunctionNode.
-In any case, the SequenceRunner is the one that guaranties the right order of
-execution, like a master of orchestra. The SequenceRunner still owns the
-queues to store results. Keeping history, evaluate Python expressions, start
-functions, every one of these actions can be coded in Node classes.
-Sequence variables can still be owned by the SequenceRunner.
