@@ -35,7 +35,7 @@ setup(
     packages=find_packages(),
     package_data={'yapyseq': ['seq_schema.yaml']},
     data_files=[('.', ['VERSION'])],
-    install_requires=['pyyaml', 'yamale', 'Click'],
+    install_requires=['pyyaml', 'ruamel.yaml', 'Click'],
     tests_require=['pytest'],
     license="MPL-2.0",
     classifiers=[

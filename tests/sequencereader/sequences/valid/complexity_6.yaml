@@ -1,7 +1,7 @@
 sequence:
 
   constants:
-    name: complexity 6
+    name: "complexity 6"
     one: 1
     bool: True
 

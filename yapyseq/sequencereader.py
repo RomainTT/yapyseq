@@ -12,7 +12,7 @@ from collections import Counter
 from typing import Set, Dict
 import copy
 
-import yaml
+from ruamel.yaml import YAML
 import yamale
 
 from yapyseq.nodes import StartNode, StopNode, ParallelSplitNode, \
@@ -89,7 +89,9 @@ class SequenceReader(object):
         File can be checked with `SequenceReader.check_sequence`.
         """
         with open(self._seq_file_path) as f:
-            loaded = yaml.safe_load(f)
+            yaml = YAML(typ='safe')
+            yaml.preserve_quotes = True
+            loaded = yaml.load(f)
 
         # Collect constants
         if 'constants' in loaded['sequence']:
@@ -175,10 +177,13 @@ class SequenceReader(object):
              See `seq_schema.yaml`.
             Same as `yamale.validate` in case it raises others than ValueError
         """
-        for f in [seq_file_path, schema_path]:
-            if not os.path.isfile(f):
-                raise FileNotFoundError("File cannot be found at given "
-                                        "path: {}".format(f))
+        if not os.path.isfile(seq_file_path):
+            raise FileNotFoundError("Sequence file cannot be found at given "
+                                    "path: {}".format(seq_file_path))
+
+        if not os.path.isfile(schema_path):
+            raise FileNotFoundError("Schema file cannot be found at given "
+                                    "path: {}".format(schema_path))
 
         schema = yamale.make_schema(schema_path)
         data = yamale.make_data(seq_file_path)
@@ -193,7 +198,9 @@ class SequenceReader(object):
 
         # Check uniqueness of the IDs
         with open(seq_file_path) as f:
-            loaded = yaml.safe_load(f)
+            yaml = YAML(typ='safe')
+            yaml.preserve_quotes = True
+            loaded = yaml.load(f)
         item_ids = [i['id'] for i in loaded['sequence']['nodes']]
         # Count the occurrence of each ID, and keep those that appear
         # more than once to raise an exception.

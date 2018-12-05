@@ -1,7 +1,7 @@
 sequence:
 
   constants:
-    constant: u"Constant value"
+    constant: "Constant value"
 
   nodes:
   - id: 0
@@ -12,7 +12,7 @@ sequence:
   - id: 1
     type: variable
     variables:
-      constant: u"new value"  # Forbidden
+      constant: "new value"  # Forbidden
     transitions:
     - target: 2
 
