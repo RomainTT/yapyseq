@@ -370,8 +370,48 @@ sr.run()
 
 ## Transitions
 
-TODO
+Every node must have at least one transition, except stop nodes. A transition
+has two attributes:
+* the target: it is the ID of the next node to go to when the execution of the 
+  current node is over.
+* the condition: it is a Python expression that must return `True` in order to 
+  validate the transition. Condition is optional, if there is none it is 
+  by default equal to a `True`.
+
+There must be one and only one validated transition per node, as a node 
+cannot lead to several other nodes at the same time. Therefore, one must 
+be careful while writing the conditions of the transitions.
+This rule does not apply to a `parallel_split` node as it is a node which can
+lead to several nodes.
 
 ## Examples of sequence structures
+
+### Simple line
+
+![](resources/ex_simple_line.png)
+
+TODO
+
+### Simple parallelism
+
+![](resources/ex_simple_parallel.png)
+
+TODO
+
+### Simple loop
+
+![](resources/ex_simple_loop.png)
+
+TODO
+
+### Multiple paths
+
+![](resources/ex_multiple_paths.png)
+
+TODO
+
+### Multiple start stop
+
+![](resources/ex_multiple_start_stop.png)
 
 TODO

@@ -2,21 +2,45 @@
 
 ## Internal architecture
 
-TODO
+Here are the main classes of yapyseq:
+* `SequenceRunner`: the aim of an instance of this class is to run the nodes 
+  and manage the transitions.
+* `SequenceReader`: the aim of an instance of this class is to read a `.yaml` 
+  file that describes a sequence, create Node objects using parameters from this 
+  file, and make them available through its API.
+* `FunctionGrabber`: the aim of an instance of this class is:
+   * to import the python files containing the functions that can be
+     called in a given sequence.
+   * Provide these functions on demand through its API
 
-### Nodes
+When running a sequence, a `SequenceRunner` is created first and this object 
+creates its own `SequenceReader` and `FunctionGrabber` during its 
+initialization.
 
-Here are the different kinds of nodes:
-  * start
-  * stop
-  * function
-  * parallel_split
-  * parallel_sync
-  * variable
- 
-In any sequence, there is at least one start and one stop.
- 
-### Sub-sequences
+## Node management
+
+### Function node
+
+An instance of `SequenceRunner` runs a new thread to run a node of type 
+"function". When the thread is ended, it means that the function is over. In 
+that case the `SequenceRunner` detects it, finds the next node, and starts a new 
+thread for this next node. All kind of output from a node are given to the 
+`SequenceRunner` through a shared memory (a Queue). These outputs can then be 
+used for logging, for decision making, can be transferred to other nodes, etc.
+At any time, a `SequenceRunner` has an overview of all the nodes that are
+running in its sequence.
+
+### Parallel split and sync nodes
+
+To manage "parallel split" nodes, the `SequenceRunner` simply starts several 
+nodes instead of one after the transition.
+
+To manage "parallel sync" nodes, the `SequenceRunner` keeps a history of the
+transitions that have already been performed to this node, and when all
+necessary transitions are done, it can continue the sequence and run the
+following nodes.
+
+### Sub-sequence node
 
 Sub-sequences can be contained in one node. That means another sequence is
 called in a node.
@@ -25,77 +49,3 @@ A single instance of `SequenceRunner` manages all the nodes of its sequence. If
 a sub-sequence is called, a new instance of `SequenceRunner` is created to
 manage the sub-sequence. This sub-sequence is considered as a standard node by
 the parent sequence.
-
-### Sequence execution management
-
-An instance of `SequenceRunner` runs a new thread to run a node of type 
-function. When the thread is ended, it means that the function is over. In that 
-case, the `SequenceRunner` detects it, find the next node, and start a new 
-thread for this next node. All kind of output from a node are given to the 
-`SequenceRunner` through a shared memory (a Queue). These outputs can then be 
-used for logging, for decision making, can be transferred to other nodes, etc.
-At any time, a `SequenceRunner` has an overview of all the nodes that are
-running in its sequence.
-
-To manage "parallel split" nodes, the `SequenceRunner` simply starts several 
-nodes instead of one after the transition.
-To manage "parallel sync" nodes, the `SequenceRunner` keeps a history of the
-transitions that have already been performed to this node, and when all
-necessary transitions are done, it can continue the sequence and run the
-following nodes.
-
-A tricky phenomenon can appear if 2 parallel branches that sync at some point
-are started several times in loop. If the execution of the branches is quicker 
-than the loop iteration, then no problem. But else, the synchronization node can
-be lost. That is why each passage in a "parallel split" node gives a "color" to
-the nodes that are started. Each new passage in this "parallel split" gives a 
-different color. Afterwards, the "parallel sync" will only synchronize branches
-of the same color. It means that the `SequenceRunner` will keep history of the
-transitions that have already been performed to the synchronization node, 
-keeping also their colors.
-
-```
-O -> O ->| O -> O |-> O -> O
-     ^   |-> O -> |        |
-     |---------------------|
-```
-
-Sequence that won't work: a sequence with one of several parallel branches that
-escape the synchronization point by using a transition directly to the outside
-of the synchronization. The synchronization will be stuck and never be done.
-This kind of sequence is hardly detectable (but not impossible) by yapyseq. User
-must be aware of this danger.
-
-## Python expressions in sequence files
-
-There are two types of items in the sequence file for which the string value is
-**always** evaluated as a Python expression:
-  * The condition of the transitions
-  * The variables of a node of type "variable"
-
-It means that these values will be given to the Python built-in function 
-`eval()`.
-
-Unfortunately, yaml automatically removes quotes from values. It means that the
-following yaml code:
-
-    my_key: "my_value"
-
-...is equivalent to the following one:
-
-    my_key: my_value
-
-It means that `eval()` will try to refer to the variable `my_value` instead of
-the string `"my_value"`. In order to give a single string, it must be precised
-in the sequence file, with one of the following syntax:
-
-    my_key: str(my_value)
-    my_key: u"my_value"
-
-
-# Ideas
-
-Set priorities on transitions. Priorities sharing the same source node must have
-unique priorities among them. When evaluating transitions to find the next node,
-priorities can be used to select only one transitions when several are possible.
-Nodes of type "parallel_split" do not need priorities on their transitions.
