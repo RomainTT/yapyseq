@@ -56,7 +56,7 @@ sequence:
       type: function
       function: list_path
       arguments:
-        path: str('/tmp/')
+        path: "/tmp/"
       transitions:
         - target: 2
           condition: not results[1].exception.is_raised
@@ -67,7 +67,7 @@ sequence:
       type: function
       function: hello
       arguments:
-        name: str(John)
+        name: "John"
       transitions:
         - target: 3
       
@@ -386,7 +386,7 @@ lead to several nodes.
 
 ## Examples of sequence structures
 
-### Simple line
+### Simple line
 
 ![](resources/ex_simple_line.png)
 
@@ -404,7 +404,7 @@ TODO
 
 TODO
 
-### Multiple paths
+### Multiple paths
 
 ![](resources/ex_multiple_paths.png)
 
