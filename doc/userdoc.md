@@ -1,20 +1,5 @@
 # Yapyseq user documentation
 
-## Why yapyseq ?
-
-If you have a bunch of Python functions in a bunch of files, which can be called
-in various orders in function of the need, you have two choices:
-
-* Call these functions in classic python scripts, ordering the calls with
-  Python statements. You have to write from scratch the conditional structures,
-  the multiprocessing management if necessary, and eventually write a lot of 
-  code.
-* Use yapyseq to write a sequence. A sequence file has its own syntax, it makes
-  references to Python functions that must be called. The calls, the conditional
-  transitions between them, the multiprocessing, the logging, all of these
-  things are automatically done by yapyseq without writing a single line of
-  Python code.
-
 ## Installation
 
 yapyseq is on the [Pypi](https://pypi.org) server. To install, 
