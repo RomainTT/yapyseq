@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* Logger based on logging module.
+  Used to log the behavior of sequences, but also accessible from any node.
 
 ## [1.0.0] - 2018-11-22
 

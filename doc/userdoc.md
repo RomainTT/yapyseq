@@ -231,11 +231,14 @@ arguments*, or in *variable nodes*.
 
 ### List of built-in variables:
 
-  * returns: Return values of every nodes (last run only)
+  * `returns`: Return values of every nodes (last run only)
       A dedicated data structure is used to store the result of a node function.
       It contains the exception if it raised one, and the return object.
       To know the exact structure, please refer to 
       [Function node section](#Function-node)
+  * `logger`: A Logger object from the logging module, already configured.
+      This object should be used by any function which needs to save information
+      in the log of the sequence.
 
 ### How to declare user constants?
 
