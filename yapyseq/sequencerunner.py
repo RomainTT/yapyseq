@@ -344,15 +344,22 @@ class SequenceRunner(object):
             new_result: the FunctionNodeResult object.
 
         """
+        # Get the node of the result
+        node_object = self._nodes[new_result.nid]
+
         # Save this result into the sequence variables
         self._variables['results'][new_result.nid] = new_result
+
+        # If a name has been given, store the return object into a
+        # sequence variable with this name.
+        if node_object.return_var_name:
+            self._variables[node_object.return_var_name] = new_result.returned
 
         # Remove this node from the running nodes
         self._running_nodes.pop(new_result.nid)
 
         # Get the next node according to transitions
         # and add it to the set of new nodes
-        node_object = self._nodes[new_result.nid]
         next_node_ids = node_object.get_next_node_id(self._variables)
         self._add_new_nodes(next_node_ids, new_result.nid)
 

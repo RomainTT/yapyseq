@@ -60,6 +60,7 @@ class TestSequenceReaderParsing(object):
         assert n.nid == 2
         assert n.name == "Dummy node function"
         assert n.function_name == "dummy_function"
+        assert n.return_var_name == 'spam'
         assert n.get_all_next_node_ids() == {5}
 
         n = node_dict[5]

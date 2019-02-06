@@ -96,3 +96,11 @@ class TestSequenceRunner(object):
         # Lines should contain numbers from 1 to 10
         for i in range(1, 11):
             assert lines.pop() == str(i)
+
+    def test_return_variable(self, func_dir, seq_dir):
+        """Check that the 'return' attribute of a function node works"""
+        sequence = os.path.join(seq_dir, "return_variable.yaml")
+        runner = SequenceRunner(sequence, func_dir)
+        runner.run()
+        spam = runner.variables['spam']
+        assert spam == "Hello world!"

@@ -35,6 +35,7 @@ function_node:
   function: str(required=True)  # name of the function to run
   arguments: map(required=False)  # args to give to the function
   timeout: num(required=False)  # timeout of the function, in sec
+  return: str(required=False)  # variable in which returned object must be stored
   transitions: list(include('transition'), required=True)
 
 variable_node:

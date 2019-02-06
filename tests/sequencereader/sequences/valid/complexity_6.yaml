@@ -26,6 +26,7 @@ sequence:
       type: function
       name: Dummy node function
       function: dummy_function
+      return: spam
       transitions:
       - target: 5
 

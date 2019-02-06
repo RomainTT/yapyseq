@@ -110,7 +110,8 @@ class SequenceReader(object):
                     transitions=node_dict.get('transitions'),
                     function_name=node_dict.get('function'),
                     function_kwargs=node_dict.get('arguments'),
-                    timeout=node_dict.get('timeout'))
+                    timeout=node_dict.get('timeout'),
+                    return_var_name=node_dict.get('return'))
 
             elif ntype == "start":
                 new_node = StartNode(

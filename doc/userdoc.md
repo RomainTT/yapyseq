@@ -109,6 +109,20 @@ Example:
         condtion: len(results[1].returned) == 0
 ```
 
+To give easier access to a returned object, a variable name can be given in the
+node description. In the following example, the returned object of `list_path`
+will be available in the sequence variable `spam` for the rest of the sequence,
+instead of calling results[1].returned:
+
+```yaml
+    id: 1
+    type: function
+    function: list_path
+    arguments:
+      path: str('/tmp/')
+    return: spam
+```
+
 #### Variable node
 
 A variable node is used to create/update some sequence variables. Sequence

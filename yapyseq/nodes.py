@@ -317,7 +317,8 @@ class FunctionNode(SimpleTransitionalNode):
 
     def __init__(self, nid: int, function_name: str,
                  transitions: Set, function_kwargs: Dict = None,
-                 name: str = None, timeout: int = None):
+                 name: str = None, timeout: int = None,
+                 return_var_name: str = None):
         """Initialize a FunctionNode.
 
         Args:
@@ -328,11 +329,14 @@ class FunctionNode(SimpleTransitionalNode):
             transitions: the outgoing transitions of the node.
             name: (optional) the name of the node.
             timeout: (optional) the timeout limit of the function, in seconds.
+            return_var_name: (optional) the variable name in which the sequence
+                runner will store the returned object of the function.
         """
         super().__init__(nid, transitions, name)
         self._function_name = function_name
         self._function_kwargs = function_kwargs if function_kwargs else dict()
         self._timeout = timeout
+        self._return_var_name = return_var_name
 
     @property
     def function_name(self) -> str:
@@ -343,6 +347,11 @@ class FunctionNode(SimpleTransitionalNode):
     def function_kwargs(self) -> Dict:
         """The keyword arguments of the function to run (read-only)."""
         return self._function_kwargs
+
+    @property
+    def return_var_name(self) -> str:
+        """The variable name to store the returned object of the function."""
+        return self._return_var_name
 
     @property
     def timeout(self):
