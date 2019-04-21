@@ -36,7 +36,8 @@ function_node:
   arguments: map(required=False)  # args to give to the function
   timeout: num(required=False)  # timeout of the function, in sec
   return: str(required=False)  # variable in which returned object must be stored
-  transitions: list(include('transition'), required=True)
+  transitions: list(include('transition'), required=True)  # transitions of this node
+  wrappers: list(str(), map(), required=False)  # wrappers around this node
 
 variable_node:
   type: enum('variable', required=True)

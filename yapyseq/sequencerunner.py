@@ -18,7 +18,7 @@ from yapyseq.sequencereader import SequenceReader
 from yapyseq.nodes import FunctionNode, StartNode, StopNode, VariableNode, \
     ParallelSyncNode, ParallelSplitNode, FunctionNodeResult
 from yapyseq.logger import get_logger
-
+from yapyseq.common import evaluate_expr
 
 # ------------------------------------------------------------------------------
 # Custom exception for this module
@@ -142,11 +142,14 @@ class SequenceRunner(object):
         # See SequenceRunner.run() for the uses of the following attribute.
         self._result_queue = mp.Queue()
 
-        # Grab all the functions
+        # Grab all functions and wrappers
         # This is where all the imports can fail
         self._funcgrab.import_functions(
             func_dir,
             self._seqreader.get_node_function_names())
+        self._funcgrab.import_wrappers(
+            func_dir,
+            self._seqreader.get_node_wrapper_names())
 
         # Get the dictionary of nodes
         # keys are the nids, and values the node objects
@@ -169,25 +172,6 @@ class SequenceRunner(object):
         self._logger.info(('Finished initialization of sequence {}'
                            ).format(self.basename))
 
-    def _evaluate_expr(self, expr: Any) -> Any:
-        """Evaluate a Python expression knowing the sequence variables.
-
-        Args:
-            expr: a string with a Python expression
-              or a directly a Python object if not an expression.
-
-        Returns:
-            The value of the evaluated expression, or the object itself if it is
-            not an expression.
-        """
-        if type(expr) is str:
-            # None is given as globals and variables are given as locals
-            value = eval(expr, None, self._variables)
-        else:
-            # If the expression is not an expression but directly
-            # a value, do not evaluate it.
-            value = expr
-        return value
 
     def _add_new_nodes(self, new_node_ids: Union[int, Set[int]],
                        previous_node_id: Union[int, None]) -> None:
@@ -293,7 +277,7 @@ class SequenceRunner(object):
                                      "").format(new_node.nid, inter))
             # Evaluate expression for each variable
             for var_name, expr in var_dict.items():
-                value = self._evaluate_expr(expr)
+                value = evaluate_expr(expr, self._variables)
                 # Update the writeable sequence variable
                 self._variables[var_name] = value
             # Apply transition
@@ -306,21 +290,17 @@ class SequenceRunner(object):
         # ----------------------------------------------------------------------
         # if the node is of type "function", run the function in a process
         elif isinstance(new_node, FunctionNode):
-            # First, fetch the callable
+            # Fetch the callable and the wrappers
             func_callable = self._funcgrab.get_function(new_node.function_name)
-            # And evaluate the kwargs in case there are some variables in it
-            evaluated_kwargs = {}
-            for key, val in new_node.function_kwargs.items():
-                evaluated_kwargs[key] = self._evaluate_expr(val)
-            # Finally, create a new Process to run this function
+            node_wrappers = self._funcgrab.get_wrappers(new_node.wrapper_names) 
+            # Create a new Process to run this function
             process = mp.Process(
-                target=FunctionNode._run_function_with_timeout,
+                target=new_node.run,
                 name="Node {}".format(new_node.nid),
-                kwargs={'func': func_callable,
-                        'node_id': new_node.nid,
+                kwargs={'func_callable': func_callable,
+                        'wrapper_classes': node_wrappers,
                         'result_queue': self._result_queue,
-                        'kwargs': evaluated_kwargs,
-                        'timeout': new_node.timeout})
+                        'variables': self._variables.copy()})
             process.start()
             # Store this process in the dict of running nodes
             self._running_nodes[new_node.nid] = process

@@ -29,6 +29,9 @@ sequence:
       return: spam
       transitions:
       - target: 5
+      wrappers:
+      - WrapperSpam: {arg: "value"}
+      - WrapperEgg
 
     - id: 3
       type: function
@@ -36,6 +39,8 @@ sequence:
       function: spam_function
       transitions:
       - target: 6
+      wrappers:
+      - WrapperFoo
 
     - id: 4
       type: function
@@ -43,6 +48,8 @@ sequence:
       function: egg_function
       transitions:
       - target: 7
+      wrappers:
+      - WrapperBar: {}
 
     - id: 5
       type: parallel_split

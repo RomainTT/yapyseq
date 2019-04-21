@@ -1,0 +1,39 @@
+sequence:
+  nodes:
+  - id: 0
+    type: start
+    transitions:
+    - target: 1
+
+  - id: 1
+    type: function
+    function: return_arg
+    arguments:
+      arg: wrappers['WrapperSetFoo']
+    transitions:
+      - target: 2
+    wrappers:
+      - WrapperSetFoo
+
+  - id: 2
+    type: function
+    function: return_arg
+    arguments:
+      arg: wrappers['WrapperToCaps']
+    transitions:
+      - target: 3
+    wrappers:
+      - WrapperSetFoo
+      - WrapperToCaps: {text: "wrappers['WrapperSetFoo']"}
+
+  - id: 3
+    type: function
+    function: return_hello_world
+    transitions:
+    - target: 4
+    wrappers:
+    - WrapperWriteInFile:
+        filepath: u"tests/sequencerunner/wrap.txt"
+
+  - id: 4
+    type: stop

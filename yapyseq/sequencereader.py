@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 """
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -8,7 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 import os
-from collections import Counter
+from collections import Counter, OrderedDict
 from typing import Set, Dict
 import copy
 
@@ -27,10 +26,10 @@ from yapyseq.nodes import StartNode, StopNode, ParallelSplitNode, \
 SEQUENCE_SCHEMA_PATH = "{}/seq_schema.yaml".format(
     os.path.dirname(os.path.realpath(__file__)))
 
-
 # ------------------------------------------------------------------------------
 # Custom exception for this module
 # ------------------------------------------------------------------------------
+
 
 class SequenceFileError(OSError):
     pass
@@ -39,6 +38,7 @@ class SequenceFileError(OSError):
 # ------------------------------------------------------------------------------
 # Main class
 # ------------------------------------------------------------------------------
+
 
 class SequenceReader(object):
     """Class that checks, reads, and extract Nodes from a sequence description.
@@ -57,7 +57,8 @@ class SequenceReader(object):
     # Private methods
     # --------------------------------------------------------------------------
 
-    def __init__(self, seq_file_path: str,
+    def __init__(self,
+                 seq_file_path: str,
                  schema_path: str = SEQUENCE_SCHEMA_PATH):
         """Initialize the SequenceReader with a given sequence.
 
@@ -104,6 +105,24 @@ class SequenceReader(object):
             ntype = node_dict['type']
 
             if ntype == "function":
+                # list of wrappers is converted into an OrderedDict
+                wrapper_list = node_dict.get('wrappers')
+                if wrapper_list:
+                    wrapper_dict = OrderedDict()
+                    for wrapper in wrapper_list:
+                        # A wrapper can be written as a simple string (name)
+                        # or as a dict if some arguments are given.
+                        if isinstance(wrapper, str):
+                            wrapper_dict[wrapper] = {}
+                        elif isinstance(wrapper, dict):
+                            wrapper_dict.update(wrapper)
+                        else:
+                            raise SequenceFileError(
+                                ('The following wrapper is neiter a str '
+                                 ' or a dict: {}').format(wrapper))
+                else:
+                    wrapper_dict = None
+                # create function node
                 new_node = FunctionNode(
                     nid=node_dict.get('id'),
                     name=node_dict.get('name'),
@@ -111,18 +130,17 @@ class SequenceReader(object):
                     function_name=node_dict.get('function'),
                     function_kwargs=node_dict.get('arguments'),
                     timeout=node_dict.get('timeout'),
-                    return_var_name=node_dict.get('return'))
+                    return_var_name=node_dict.get('return'),
+                    wrappers=wrapper_dict)
 
             elif ntype == "start":
-                new_node = StartNode(
-                    nid=node_dict.get('id'),
-                    name=node_dict.get('name'),
-                    transitions=node_dict.get('transitions'))
+                new_node = StartNode(nid=node_dict.get('id'),
+                                     name=node_dict.get('name'),
+                                     transitions=node_dict.get('transitions'))
 
             elif ntype == "stop":
-                new_node = StopNode(
-                    nid=node_dict.get('id'),
-                    name=node_dict.get('name'))
+                new_node = StopNode(nid=node_dict.get('id'),
+                                    name=node_dict.get('name'))
 
             elif ntype == "variable":
                 new_node = VariableNode(
@@ -144,10 +162,9 @@ class SequenceReader(object):
                     transitions=node_dict.get('transitions'))
 
             else:
-                raise SequenceFileError(
-                    "Node n°{} has an unknown type "
-                    "{}.".format(node_dict['id'], node_dict['type'])
-                )
+                raise SequenceFileError("Node n°{} has an unknown type "
+                                        "{}.".format(node_dict['id'],
+                                                     node_dict['type']))
             # Add the new node to set of nodes in the SequenceReader
             self._nodes.add(new_node)
 
@@ -197,11 +214,13 @@ class SequenceReader(object):
                                      "\nGot following message:\n"
                                      "{}").format(seq_file_path, str(e)))
 
-        # Check uniqueness of the IDs
+        # Load the sequence file
         with open(seq_file_path) as f:
             yaml = YAML(typ='safe')
             yaml.preserve_quotes = True
             loaded = yaml.load(f)
+
+        # Check uniqueness of the IDs
         item_ids = [i['id'] for i in loaded['sequence']['nodes']]
         # Count the occurrence of each ID, and keep those that appear
         # more than once to raise an exception.
@@ -214,8 +233,9 @@ class SequenceReader(object):
         # Check compliance between transition IDs and node IDs
         # And check that start nodes do not have IN transitions
         # First, get all the ids of start nodes
-        start_nids = [i['id'] for i in loaded['sequence']['nodes']
-                      if i['type'] == "start"]
+        start_nids = [
+            i['id'] for i in loaded['sequence']['nodes'] if i['type'] == "start"
+        ]
         # Then, browse every node to check its transitions
         for node in loaded['sequence']['nodes']:
             if 'transitions' in node:
@@ -278,8 +298,21 @@ class SequenceReader(object):
             A set of strings being the names of all the node functions in the
             sequence.
         """
-        return set([n.function_name for n in self._nodes
-                    if type(n) is FunctionNode])
+        return set(
+            [n.function_name for n in self._nodes if type(n) is FunctionNode])
+
+    def get_node_wrapper_names(self) -> Set[str]:
+        """Get the name of all the node wrappers in the sequence.
+
+        Returns:
+            A set of strings being the names of all the node wrappers in the
+            sequence.
+        """
+        all_names = set()
+        for node in self._nodes:
+            if type(node) is FunctionNode:
+                all_names.update(node.wrapper_names)
+        return all_names
 
     def get_start_node_ids(self):
         """Get the IDs of all the start nodes in the sequence.

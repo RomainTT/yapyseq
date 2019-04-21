@@ -71,9 +71,9 @@ sequence:
         path: "/tmp/"
       transitions:
         - target: 2
-          condition: not results[1].exception.is_raised
+          condition: not results[1].exception
         - target: 3
-          condition: results[1].exception.is_raised
+          condition: results[1].exception
 
     - id: 2
       type: function
@@ -82,7 +82,7 @@ sequence:
         name: "John"
       transitions:
         - target: 3
-      
+
     - id: 3
       type: stop
 ```
@@ -115,7 +115,7 @@ situations. Please read the next sections to learn more.
 
 ## More details for users
 
-To get more details about how to use `yapyseq`, please read the 
+To get more details about how to use `yapyseq`, please read the
 [user documentation](doc/userdoc.md).
 
 ## Contributions

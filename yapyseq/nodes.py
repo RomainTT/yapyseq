@@ -1,29 +1,27 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 """
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
-from typing import Callable, Union, Set, Dict, Any
-from collections import namedtuple
+from typing import Callable, Union, Set, Dict, Any, Tuple
+from collections import namedtuple, OrderedDict
 import multiprocessing as mp
 from queue import Empty as EmptyQueueException
+from yapyseq.common import YapyseqInternalError, evaluate_kwargs
 
 # ------------------------------------------------------------------------------
 # Custom types for this module
 # ------------------------------------------------------------------------------
 
-ExceptInfo = namedtuple("ExceptInfo", "is_raised name object")
-FunctionNodeResult = namedtuple("FunctionNodeResult",
-                                "nid exception returned")
+ExceptInfo = namedtuple("ExceptInfo", "function wrappers")
+FunctionNodeResult = namedtuple("FunctionNodeResult", "nid exception returned")
 
 # ------------------------------------------------------------------------------
 # Custom exception for this module
 # ------------------------------------------------------------------------------
-
 
 class MultipleTransitionError(RuntimeError):
     pass
@@ -48,10 +46,81 @@ class PreviousNodeUndefined(ReferenceError):
 class NodeFunctionTimeout(TimeoutError):
     pass
 
+
+class NodeWrapperInitError(RuntimeError):
+    """Raised when an error appears in the init of a wrapper."""
+    def __init__(self, nid, wrapper_name, cause=None):
+        """Initialize the exception.
+
+        Args:
+            nid: ID of the node where the exception occured.
+            wrapper_name: (str) the name of the wrapper that raised the
+                exception. Stored as a publict attribute of this object.
+            cause: subclass on Exception. The exception raised by the wrapper
+                that is the direct cause of this exception. Stored
+                as a public attribute of this object.
+        """
+        self.nid = nid
+        self.wrapper_name = wrapper_name
+        self.cause = cause
+
+    def __str__(self):
+        msg = ("Wrapper '{}' of node '{}' raised the following exception "
+               "during its initialization: \n\n{}").format(
+                   self.wrapper_name, self.nid, self.cause)
+        return msg
+
+
+class NodeWrapperPreError(RuntimeError):
+    """Raised when an error appears in the `pre` function of a wrapper."""
+    def __init__(self, nid, wrapper_name, cause=None):
+        """Initialize the exception.
+
+        Args:
+            nid: ID of the node where the exception occured.
+            wrapper_name: (str) the name of the wrapper that raised the
+                exception. Stored as a publict attribute of this object.
+            cause: subclass on Exception. The exception raised by the wrapper
+                that is the direct cause of this exception. Stored
+                as a public attribute of this object.
+        """
+        self.nid = nid
+        self.wrapper_name = wrapper_name
+        self.cause = cause
+
+    def __str__(self):
+        msg = ("Wrapper '{}' of node '{}' raised the following exception "
+               "during the run of 'pre' function: \n\n{}").format(
+                   self.wrapper_name, self.nid, self.cause)
+        return msg
+
+
+class NodeWrapperPostError(RuntimeError):
+    """Raised when an error appears in the `post` function of a wrapper."""
+    def __init__(self, nid, wrapper_name, cause=None):
+        """Initialize the exception.
+
+        Args:
+            nid: ID of the node where the exception occured.
+            wrapper_name: (str) the name of the wrapper that raised the
+                exception. Stored as a publict attribute of this object.
+            cause: subclass on Exception. The exception raised by the wrapper
+                that is the direct cause of this exception. Stored
+                as a public attribute of this object.
+        """
+        self.nid = nid
+        self.wrapper_name = wrapper_name
+        self.cause = cause
+
+    def __str__(self):
+        msg = ("Wrapper '{}' of node '{}' raised the following exception "
+               "during the run of 'post' function: \n\n{}").format(
+                   self.wrapper_name, self.nid, self.cause)
+        return msg
+
 # ------------------------------------------------------------------------------
 # Main classes
 # ------------------------------------------------------------------------------
-
 
 class Transition(object):
     """Class representing a transition."""
@@ -144,6 +213,94 @@ class Node(object):
         self._previous_node_id = value
 
 
+class WrappedNode(Node):
+    """Class representing a node that contains wrappers."""
+
+    def __init__(self, wrappers: OrderedDict, nid: int, name: str = None):
+        """Initialize a WrapperManager.
+
+        Args:
+            wrappers: an OrderedDict of wrappers around this node.
+                Keys are the names of wrapper classes, and values are arguments
+                for constructors of these classes.
+            nid: the unique ID of the node.
+            name: (optional) the name of the node.
+        """
+        super().__init__(nid, name)
+        self._wrappers_desc = wrappers if wrappers else OrderedDict()
+        self._wrapper_objects = {}
+        # Prepare a list of wrappers that run pre() successfully
+        self._wrappers_pre_success = []
+
+    @property
+    def wrapper_names(self) -> Set[str]:
+        """The set of wrapper names for this function (read-only)."""
+        return set(self._wrappers_desc.keys())
+
+    def _run_wrappers_pre(self, variables: Dict,
+                         wrapper_classes: Dict) -> None:
+        """Initialize wrappers and run their 'pre' function.
+
+        Args:
+            variables: local variables taken into account while
+                evaluating arguments of wrappers. It will be updated inside
+                this function to add the sub-dictionnary 'wrappers'.
+            wrapper_classes: (optional) A dictionary where keys are the names
+                of the wrappers for this node, and values are the corresponding
+                classes. Values must not be instance but references to a class.
+                Classes must inherit from yapyseq.NodeWrapper.
+        Raises:
+            * NodeWrapperPreError if one of the wrappers raised an exception.
+              Original exception is set as a *cause* of this exception.
+            * NodeWrapperInitError if one of the wrappers raised an exception
+              while being instanciated. Original exception is set as a *cause*
+              of this exception.
+            * YapyseqInternalError if the number of given wrappers is
+              unexpected.
+        """
+        if len(self._wrappers_desc) != len(wrapper_classes):
+            raise YapyseqInternalError(("Number of given wrappers is not the"
+                                       " one expected in node"
+                                       "{}.").format(self.nid))
+        # Clean the previous dictionary
+        self._wrapper_objects = {}
+        # Initialize the wrapper dictionary inside variables
+        variables['wrappers'] = {}
+        # Iterate over all the wrappers
+        for wrapper_name, wrapper_kwargs in self._wrappers_desc.items():
+            # Initialize the wrapper
+            try:
+                # Make an instance of the wrapper, with its evaluated arguments
+                evaluated_kwargs = evaluate_kwargs(wrapper_kwargs, variables)
+                self._wrapper_objects[wrapper_name] = wrapper_classes[
+                    wrapper_name](**evaluated_kwargs)
+            except Exception as exc:
+                raise NodeWrapperInitError(self.nid, wrapper_name, exc)
+            # Run its `pre` function
+            try:
+                variables['wrappers'][wrapper_name] = self._wrapper_objects[
+                    wrapper_name].pre()
+            except Exception as exc:
+                raise NodeWrapperPreError(self.nid, wrapper_name, exc)
+            self._wrappers_pre_success.append(wrapper_name)
+
+    def _run_wrappers_post(self) -> None:
+        """Run the 'post' function of the wrappers.
+
+        Raises:
+            NodeWrapperPostError if one of the wrappers raised an exception.
+            Original exception is set as a *cause* of this exception.
+        """
+        for wrapper_name, wrapper_obj in self._wrapper_objects.items():
+            # Only run the post of wrappers that correctly did their pre
+            if wrapper_name not in self._wrappers_pre_success:
+                continue
+            try:
+                wrapper_obj.post()
+            except Exception as exc:
+                raise NodeWrapperPostError(self.nid, wrapper_name, exc)
+
+
 class TransitionalNode(Node):
     """Class representing a node which contains outgoing transitions.
 
@@ -164,8 +321,10 @@ class TransitionalNode(Node):
             name: (optional) the name of the node.
         """
         super().__init__(nid, name)
-        self._transitions = set([Transition(t.get('target'), t.get('condition'))
-                                 for t in transitions])
+        self._transitions = set([
+            Transition(t.get('target'), t.get('condition'))
+            for t in transitions
+        ])
 
     def get_all_next_node_ids(self) -> Set[int]:
         """Get the IDs of every nodes that can be reached from this one.
@@ -312,13 +471,18 @@ class ParallelSyncNode(SimpleTransitionalNode):
         self._sync_history.add(nid)
 
 
-class FunctionNode(SimpleTransitionalNode):
+class FunctionNode(SimpleTransitionalNode, WrappedNode):
     """Class representing a node of type function."""
 
-    def __init__(self, nid: int, function_name: str,
-                 transitions: Set, function_kwargs: Dict = None,
-                 name: str = None, timeout: int = None,
-                 return_var_name: str = None):
+    def __init__(self,
+                 nid: int,
+                 function_name: str,
+                 transitions: Set,
+                 function_kwargs: Dict = None,
+                 name: str = None,
+                 timeout: int = None,
+                 return_var_name: str = None,
+                 wrappers: OrderedDict = None):
         """Initialize a FunctionNode.
 
         Args:
@@ -331,8 +495,15 @@ class FunctionNode(SimpleTransitionalNode):
             timeout: (optional) the timeout limit of the function, in seconds.
             return_var_name: (optional) the variable name in which the sequence
                 runner will store the returned object of the function.
+            wrappers: (optional) an OrderedDict of wrappers around this node.
+                Keys are the names of wrapper classes, and values are arguments
+                for constructors of these classes.
         """
-        super().__init__(nid, transitions, name)
+        # Here I do NOT use super() because it becomes really hard to maintain
+        # in case of inheritance diamond like here. Fore more information, read
+        # https://fuhm.org/super-harmful/
+        SimpleTransitionalNode.__init__(self, nid, transitions, name)
+        WrappedNode.__init__(self, wrappers, nid, name)
         self._function_name = function_name
         self._function_kwargs = function_kwargs if function_kwargs else dict()
         self._timeout = timeout
@@ -344,24 +515,13 @@ class FunctionNode(SimpleTransitionalNode):
         return self._function_name
 
     @property
-    def function_kwargs(self) -> Dict:
-        """The keyword arguments of the function to run (read-only)."""
-        return self._function_kwargs
-
-    @property
     def return_var_name(self) -> str:
         """The variable name to store the returned object of the function."""
         return self._return_var_name
 
-    @property
-    def timeout(self):
-        """The timeout limit of the function, in seconds (read-only).
 
-        Timeout is None if no timeout has been provided."""
-        return self._timeout
-
-    @staticmethod
-    def _create_node_result(node_id: int, exception: Union[None, Exception],
+    def _create_node_result(self, function_exception: Union[None, Exception],
+                            wrappers_exception: Union[None, Exception],
                             returned_obj: Any) -> FunctionNodeResult:
         """Return an easy data structure containing result of a node.
 
@@ -372,112 +532,164 @@ class FunctionNode(SimpleTransitionalNode):
         Returns:
             A namedtuple containing all the given data in a structured form.
         """
-        if exception:
-            except_info = ExceptInfo(True,
-                                     type(exception).__name__,
-                                     exception)
+        # Add name to exception objects for more convenience
+        if function_exception:
+            function_exception.name = type(function_exception).__name__
+        if wrappers_exception:
+            wrappers_exception.name = type(wrappers_exception).__name__
+        # Save exceptions in the result object
+        if wrappers_exception or function_exception:
+            except_info = ExceptInfo(function_exception, wrappers_exception)
         else:
-            except_info = ExceptInfo(False, None, None)
-
-        res = FunctionNodeResult(node_id,
-                                 except_info,
-                                 returned_obj)
+            except_info = None
+        # Create final result object
+        res = FunctionNodeResult(self.nid, except_info, returned_obj)
         return res
 
-    @staticmethod
-    def _run_function_no_timeout(func: Callable, node_id: int,
-                                 result_queue: mp.Queue,
-                                 kwargs: Dict = None) -> None:
-        """Function that can be called in a thread to run a node function.
-
-        This function does:
-          * Run the given callable that has been given, with the given arguments
-          * Provide the result of the callable through a Queue
+    def _run_function_no_timeout(self,
+                                 func: Callable,
+                                 kwargs: Dict = None,
+                                 queue: mp.Queue = None) -> Tuple:
+        """Run the function without a timeout and return result.
 
         Args:
             func: The function to be run. Must be a callable.
-            node_id: The ID of the node containing the function. It is only used
-              to be stored in the result object.
-            result_queue: The Queue object to store the result of the node
-              function. The stored object will be of type FunctionNodeResult.
             kwargs: (optional) The arguments to give to the function.
+            queue: (optional) A queue to put the result, if given.
+        Returns:
+            2-tuple: returned_obj, raised_exception
+            One of the items is necessary None.
         """
-
         # Run the callable
         try:
             func_res = func(**kwargs)
-        except Exception as e:
-            res = FunctionNode._create_node_result(node_id, e, None)
+        except Exception as exc:
+            res = None, exc
         else:
-            res = FunctionNode._create_node_result(node_id, None, func_res)
+            res = func_res, None
+        if queue:
+            queue.put(res)
+        return res
 
-        # Provide result through the Queue
-        result_queue.put(res)
-
-    @staticmethod
-    def _run_function_with_timeout(func: Callable, node_id: int,
-                                   result_queue: mp.Queue,
-                                   kwargs: Dict = None,
-                                   timeout: int = None) -> None:
-        """Function that can be called in a thread to run a node function.
-
-        This function does:
-          * Run the given callable that has been given, with the given arguments
-          * Manage a Timeout on this callable
-          * Provide the result of the callable through a Queue
+    def _run_function_with_timeout(self, func: Callable,
+                                   kwargs: Dict = None) -> Tuple:
+        """Run the function with a timeout and return result.
 
         Args:
             func: The function to be run. Must be a callable.
-            node_id: The ID of the node containing the function. It is only used
-              to be stored in the result object.
-            result_queue: The Queue object to store the result of the node
-              function. The stored object will be of type FunctionNodeResult.
             kwargs: (optional) The arguments to give to the function.
-            timeout: (optional) The time limit for the function to be
-              terminated.
+
+        Returns:
+            2-tuple: returned_obj, raised_exception
+            One of the items is necessary None.
         """
-        if not timeout:
-            # Just start the function without timeout
-            # and without creating a new thread.
-            # Note: this separate condition could be avoided because Queue.get
-            # manages a None timeout, but this implementation avoids creating
-            # unnecessary sub-threads, so it is better like this !
-            FunctionNode._run_function_no_timeout(
-                func, node_id, result_queue, kwargs)
+        # Create a sub-result queue for the real run of the function
+        sub_result_queue = mp.Queue()
+        # Start the function in the new sub-process
+        process = mp.Process(target=self._run_function_no_timeout,
+                             name="Node {} sub-process".format(self.nid),
+                             kwargs={
+                                 'func': func,
+                                 'queue': sub_result_queue,
+                                 'kwargs': kwargs
+                             })
+        process.start()
+        try:
+            # Wait until result or timeout
+            ret, exc = sub_result_queue.get(block=True, timeout=self._timeout)
+        except EmptyQueueException:
+            # timeout occurred !
+            # Create a timeout exception to put in the result
+            exc = NodeFunctionTimeout(
+                "Function {} of node {} timed out !".format(
+                    func.__name__, self.nid))
+            return None, exc
         else:
-            # Create a sub-result queue for the real run of the function
-            sub_result_queue = mp.Queue()
-            # Start the function in the new sub-thread
-            process = mp.Process(
-                target=FunctionNode._run_function_no_timeout,
-                name="Node {} sub-thread".format(node_id),
-                kwargs={'func': func,
-                        'node_id': node_id,
-                        'result_queue': sub_result_queue,
-                        'kwargs': kwargs})
-            process.start()
-            result = None  # Just in case something goes wrong in try except
+            return ret, exc
+
+    def run(self,
+            func_callable: Callable,
+            result_queue: mp.Queue,
+            variables: Dict,
+            wrapper_classes: Dict = None) -> None:
+        """Function that can be called in a subprocess to run a node function.
+
+        This function does:
+          * Run wrappers of the node, with given arguments
+          * Run the given callable that has been given, with the given arguments
+          * Manage a Timeout on this callable if the node has one
+          * Provide the result of the callable through a Queue
+
+        Args:
+            func_callable: The function to be run. Must be a callable.
+            result_queue: The Queue object to store the result of the node
+                function. The stored object will be of type FunctionNodeResult.
+            variables: (optional) local variables taken into account while
+                evaluating arguments of wrappers and function.
+                Warning: this dict is modified by this function. Give a copy to
+                avoid access conflict.
+            wrapper_classes: (optional) A dictionary where keys are the names
+                of the wrappers for this node, and values are the corresponding
+                classes. Values must not be instance but references to a class.
+                Classes must inherit from yapyseq.NodeWrapper.
+        """
+        # Run wrappers pre
+        pre_exc = None
+        wrappers_failed = False
+        try:
+            self._run_wrappers_pre(variables, wrapper_classes)
+        except (NodeWrapperInitError, NodeWrapperPreError) as exc:
+            pre_exc = exc
+            wrappers_failed = True
+
+        # Run the function only if all of the wrappers succeeded
+        if not wrappers_failed:
+            # evaluate keyword arguments of the function
             try:
-                # Wait until result or timeout
-                result = sub_result_queue.get(block=True, timeout=timeout)
-            except EmptyQueueException:
-                # timeout occurred !
-                # Create a timeout exception to put in the result
-                exception = NodeFunctionTimeout(
-                    "Function {} of node {} timed out !".format(func.__name__,
-                                                                node_id))
-                result = FunctionNode._create_node_result(
-                    node_id, exception, None)
-            finally:
-                # Put the final result in the result queue
-                result_queue.put(result)
+                evaluated_kwargs = evaluate_kwargs(self._function_kwargs, variables)
+            except Exception as exc:
+                # If evaluation failed, do not run the function and save the
+                # exception as a function exception.
+                func_ret, func_exc = None, exc
+            else:
+                if not self._timeout:
+                    # Just start the function without timeout
+                    # and without creating a new process.
+                    # Note: this separate condition could be avoided because Queue.get
+                    # manages a None timeout, but this implementation avoids creating
+                    # unnecessary sub-processes, so it is better like this !
+                    func_ret, func_exc = self._run_function_no_timeout(
+                        func_callable, evaluated_kwargs)
+                else:
+                    func_ret, func_exc = self._run_function_with_timeout(
+                        func_callable, evaluated_kwargs)
+        # Function is not run and results are None
+        else:
+            func_ret, func_exc = None, None
+
+        # Run wrappers post
+        post_exc = None
+        try:
+            self._run_wrappers_post()
+        except NodeWrapperPostError as exc:
+            post_exc = exc
+
+        # Create the final result object
+        result = self._create_node_result(func_exc,
+                                          pre_exc if pre_exc else post_exc,
+                                          func_ret)
+        # Provide result through the Queue
+        result_queue.put(result)
 
 
 class VariableNode(SimpleTransitionalNode):
     """Class representing a node of type variable."""
 
-    def __init__(self, nid: int, variables: Dict,
-                 transitions: Set, name: str = None):
+    def __init__(self,
+                 nid: int,
+                 variables: Dict,
+                 transitions: Set,
+                 name: str = None):
         """Initialize a VariableNode.
 
         Args:
@@ -494,5 +706,6 @@ class VariableNode(SimpleTransitionalNode):
     def variables(self):
         """Dictionary of variables with python expressions as values."""
         return self._variables
+
 
 # TODO: SequenceNode

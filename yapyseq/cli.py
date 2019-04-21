@@ -77,7 +77,8 @@ def run(sequence_file, function_dir, constant, no_log):
     runner = SequenceRunner(sequence_file, function_dir, logger=(not no_log))
     try:
         runner.run(blocking=True)
-    except Exception:
+    except Exception as exc:
         # Log the exceptions if they occur
-        runner._logger.exception()
-        raise
+        runner._logger.exception('An exception was raised during the run'
+                                 ' of the sequence.')
+        raise exc

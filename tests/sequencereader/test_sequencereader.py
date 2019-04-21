@@ -62,6 +62,7 @@ class TestSequenceReaderParsing(object):
         assert n.function_name == "dummy_function"
         assert n.return_var_name == 'spam'
         assert n.get_all_next_node_ids() == {5}
+        assert n.wrapper_names == {"WrapperSpam", "WrapperEgg"}
 
         n = node_dict[5]
         assert type(n) == ParallelSplitNode
@@ -112,3 +113,12 @@ class TestSequenceReaderParsing(object):
         assert constants == {'name': 'complexity 6',
                              "one": 1,
                              "bool": True}
+
+    def test_get_node_wrapper_names(self, schema_path):
+        """Test SequenceReader.get_node_wrapper_names."""
+        seq_path = os.path.join(VALID_SEQ_PATH, "complexity_6.yaml")
+        reader = SequenceReader(seq_path, schema_path)
+        names = reader.get_node_wrapper_names()
+        assert names == {"WrapperSpam", "WrapperEgg", "WrapperFoo",
+                         "WrapperBar"}
+

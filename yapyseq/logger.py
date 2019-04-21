@@ -48,7 +48,9 @@ def get_logger(name: str,
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
 
-    if not disabled:
-        logger.addHandler(handler)
+    logger.addHandler(handler)
+
+    if disabled:
+        logging.disable(logging.CRITICAL)
 
     return logger
