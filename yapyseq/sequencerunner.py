@@ -155,6 +155,15 @@ class SequenceRunner(object):
         # keys are the nids, and values the node objects
         self._nodes = self._seqreader.get_node_dict()
 
+        # Set callable of each nodes with the ones imported earlier
+        # This is necessary before running the nodes
+        for node in self._nodes.values():
+            if isinstance(node, FunctionNode):
+                node.function_callable = self._funcgrab.get_function(
+                    node.function_name)
+                node.wrapper_classes = self._funcgrab.get_wrappers(
+                    node.wrapper_names)
+
         # Initialize new_nodes as a set of objects of type NewNode.
         # At first, new nodes are the start nodes of the sequence.
         self._new_nodes = set()
@@ -290,16 +299,11 @@ class SequenceRunner(object):
         # ----------------------------------------------------------------------
         # if the node is of type "function", run the function in a process
         elif isinstance(new_node, FunctionNode):
-            # Fetch the callable and the wrappers
-            func_callable = self._funcgrab.get_function(new_node.function_name)
-            node_wrappers = self._funcgrab.get_wrappers(new_node.wrapper_names) 
             # Create a new Process to run this function
             process = mp.Process(
                 target=new_node.run,
                 name="Node {}".format(new_node.nid),
-                kwargs={'func_callable': func_callable,
-                        'wrapper_classes': node_wrappers,
-                        'result_queue': self._result_queue,
+                kwargs={'result_queue': self._result_queue,
                         'variables': self._variables.copy()})
             process.start()
             # Store this process in the dict of running nodes

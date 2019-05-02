@@ -7,7 +7,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """
 
 from typing import Callable, Union, Set, Dict, Any, Tuple
-from collections import namedtuple, OrderedDict
+from collections import namedtuple, OrderedDict, Counter
 import multiprocessing as mp
 from queue import Empty as EmptyQueueException
 from yapyseq.common import YapyseqInternalError, evaluate_kwargs
@@ -229,6 +229,7 @@ class WrappedNode(Node):
         super().__init__(nid, name)
         self._wrappers_desc = wrappers if wrappers else OrderedDict()
         self._wrapper_objects = {}
+        self._wrapper_classes = {}
         # Prepare a list of wrappers that run pre() successfully
         self._wrappers_pre_success = []
 
@@ -237,31 +238,43 @@ class WrappedNode(Node):
         """The set of wrapper names for this function (read-only)."""
         return set(self._wrappers_desc.keys())
 
-    def _run_wrappers_pre(self, variables: Dict,
-                         wrapper_classes: Dict) -> None:
+    @property
+    def wrapper_classes(self) -> Dict:
+        """A dict. where keys are wrapper names and values are their classes."""
+        return self._wrapper_classes
+
+    @wrapper_classes.setter
+    def wrapper_classes(self, given_dict: Dict):
+        """Setter of wrapper_classes.
+
+        Args:
+            given_dict: dictionary where keys are wrapper names and values are
+                their classes.
+
+        Classes must inherit from yapyseq.NodeWrapper.
+        """
+        # Check that given dict contains all the required wrappers
+        if not (Counter(given_dict.keys()) == Counter(self.wrapper_names)):
+            raise YapyseqInternalError(
+                ("Given wrapper classes does not match"
+                 " saved wrapper names. Get {}, "
+                 "expected {}").format(given_dict.keys(), self.wrapper_names))
+        self._wrapper_classes = given_dict
+
+    def _run_wrappers_pre(self, variables: Dict) -> None:
         """Initialize wrappers and run their 'pre' function.
 
         Args:
             variables: local variables taken into account while
                 evaluating arguments of wrappers. It will be updated inside
                 this function to add the sub-dictionnary 'wrappers'.
-            wrapper_classes: (optional) A dictionary where keys are the names
-                of the wrappers for this node, and values are the corresponding
-                classes. Values must not be instance but references to a class.
-                Classes must inherit from yapyseq.NodeWrapper.
         Raises:
             * NodeWrapperPreError if one of the wrappers raised an exception.
               Original exception is set as a *cause* of this exception.
             * NodeWrapperInitError if one of the wrappers raised an exception
               while being instanciated. Original exception is set as a *cause*
               of this exception.
-            * YapyseqInternalError if the number of given wrappers is
-              unexpected.
         """
-        if len(self._wrappers_desc) != len(wrapper_classes):
-            raise YapyseqInternalError(("Number of given wrappers is not the"
-                                       " one expected in node"
-                                       "{}.").format(self.nid))
         # Clean the previous dictionary
         self._wrapper_objects = {}
         # Initialize the wrapper dictionary inside variables
@@ -272,7 +285,7 @@ class WrappedNode(Node):
             try:
                 # Make an instance of the wrapper, with its evaluated arguments
                 evaluated_kwargs = evaluate_kwargs(wrapper_kwargs, variables)
-                self._wrapper_objects[wrapper_name] = wrapper_classes[
+                self._wrapper_objects[wrapper_name] = self._wrapper_classes[
                     wrapper_name](**evaluated_kwargs)
             except Exception as exc:
                 raise NodeWrapperInitError(self.nid, wrapper_name, exc)
@@ -519,6 +532,21 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
         """The variable name to store the returned object of the function."""
         return self._return_var_name
 
+    @property
+    def function_callable(self) -> Dict:
+        """The callable of the function of this node."""
+        return self._func_callable
+
+    @function_callable.setter
+    def function_callable(self, func_callable: Callable):
+        """Setter of function_callable."""
+        # Check that the name of the callable is the one expected
+        if self._function_name != func_callable.__name__:
+            raise YapyseqInternalError(
+                ("Given callable has not the expected name. "
+                 "Get {}, expected {}").format(
+                     func_callable.__name__, self._function_name))
+        self._func_callable = func_callable
 
     def _create_node_result(self, function_exception: Union[None, Exception],
                             wrappers_exception: Union[None, Exception],
@@ -547,13 +575,13 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
         return res
 
     def _run_function_no_timeout(self,
-                                 func: Callable,
                                  kwargs: Dict = None,
                                  queue: mp.Queue = None) -> Tuple:
         """Run the function without a timeout and return result.
 
+        Property `function_callable` must be set before calling this method.
+
         Args:
-            func: The function to be run. Must be a callable.
             kwargs: (optional) The arguments to give to the function.
             queue: (optional) A queue to put the result, if given.
         Returns:
@@ -562,7 +590,7 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
         """
         # Run the callable
         try:
-            func_res = func(**kwargs)
+            func_res = self._func_callable(**kwargs)
         except Exception as exc:
             res = None, exc
         else:
@@ -571,12 +599,12 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
             queue.put(res)
         return res
 
-    def _run_function_with_timeout(self, func: Callable,
-                                   kwargs: Dict = None) -> Tuple:
+    def _run_function_with_timeout(self, kwargs: Dict = None) -> Tuple:
         """Run the function with a timeout and return result.
 
+        Property `function_callable` must be set before calling this method.
+
         Args:
-            func: The function to be run. Must be a callable.
             kwargs: (optional) The arguments to give to the function.
 
         Returns:
@@ -589,7 +617,6 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
         process = mp.Process(target=self._run_function_no_timeout,
                              name="Node {} sub-process".format(self.nid),
                              kwargs={
-                                 'func': func,
                                  'queue': sub_result_queue,
                                  'kwargs': kwargs
                              })
@@ -602,17 +629,17 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
             # Create a timeout exception to put in the result
             exc = NodeFunctionTimeout(
                 "Function {} of node {} timed out !".format(
-                    func.__name__, self.nid))
+                    self.function_name, self.nid))
             return None, exc
         else:
             return ret, exc
 
     def run(self,
-            func_callable: Callable,
             result_queue: mp.Queue,
-            variables: Dict,
-            wrapper_classes: Dict = None) -> None:
+            variables: Dict) -> None:
         """Function that can be called in a subprocess to run a node function.
+
+        Property `function_callable` must be set before calling this method.
 
         This function does:
           * Run wrappers of the node, with given arguments
@@ -621,23 +648,18 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
           * Provide the result of the callable through a Queue
 
         Args:
-            func_callable: The function to be run. Must be a callable.
             result_queue: The Queue object to store the result of the node
                 function. The stored object will be of type FunctionNodeResult.
             variables: (optional) local variables taken into account while
                 evaluating arguments of wrappers and function.
                 Warning: this dict is modified by this function. Give a copy to
                 avoid access conflict.
-            wrapper_classes: (optional) A dictionary where keys are the names
-                of the wrappers for this node, and values are the corresponding
-                classes. Values must not be instance but references to a class.
-                Classes must inherit from yapyseq.NodeWrapper.
         """
         # Run wrappers pre
         pre_exc = None
         wrappers_failed = False
         try:
-            self._run_wrappers_pre(variables, wrapper_classes)
+            self._run_wrappers_pre(variables)
         except (NodeWrapperInitError, NodeWrapperPreError) as exc:
             pre_exc = exc
             wrappers_failed = True
@@ -659,10 +681,10 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
                     # manages a None timeout, but this implementation avoids creating
                     # unnecessary sub-processes, so it is better like this !
                     func_ret, func_exc = self._run_function_no_timeout(
-                        func_callable, evaluated_kwargs)
+                        evaluated_kwargs)
                 else:
                     func_ret, func_exc = self._run_function_with_timeout(
-                        func_callable, evaluated_kwargs)
+                        evaluated_kwargs)
         # Function is not run and results are None
         else:
             func_ret, func_exc = None, None
