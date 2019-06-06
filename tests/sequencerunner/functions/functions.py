@@ -17,3 +17,7 @@ def return_hello_world() -> str:
 def write_arg_in_file(arg: Any, file: str) -> None:
     with open(file, 'a') as f:
         f.write("{}\n".format(arg))
+
+
+def return_arg(arg: Any) -> any:
+    return arg

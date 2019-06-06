@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2019-06-06
+
+### Added
+
+* Logger based on logging module.
+  Used to log the behavior of sequences, but also accessible from any node.
+* Travis job thanks to .travis.yml
+* Introduce wrappers in function nodes.
+
+### Changed
+
+* Documentation updated
+* Refactor internal code of FunctionNode
 
 ## [1.0.0] - 2018-11-22
 

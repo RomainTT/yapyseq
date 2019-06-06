@@ -1,0 +1,16 @@
+sequence:
+  nodes:
+  - id: 0
+    type: start
+    transitions:
+    - target: 1
+
+  - id: 1
+    type: function
+    function: return_hello_world
+    return: spam
+    transitions:
+    - target: 2
+
+  - id: 2
+    type: stop

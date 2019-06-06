@@ -52,7 +52,9 @@ def check(sequence_file):
 @click.option('--constant', '-c', multiple=True, type=(str, str, str),
               help=('NAME TYPE VALUE. '
                     'Type must be a valid python built-in type.'))
-def run(sequence_file, function_dir, constant):
+@click.option('--no-log', is_flag=True,
+              help='Use this option to deactivate logging.')
+def run(sequence_file, function_dir, constant, no_log):
     """Run a sequence.
 
     SEQUENCE_FILE is the path to the sequence file to check.
@@ -72,5 +74,11 @@ def run(sequence_file, function_dir, constant):
                 message='Constant type must be in {}'.format(available_types))
         constant_dict[c[0]] = eval('{}("{}")'.format(c[1], c[2]))
 
-    runner = SequenceRunner(sequence_file, function_dir)
-    runner.run(blocking=True)
+    runner = SequenceRunner(sequence_file, function_dir, logger=(not no_log))
+    try:
+        runner.run(blocking=True)
+    except Exception as exc:
+        # Log the exceptions if they occur
+        runner._logger.exception('An exception was raised during the run'
+                                 ' of the sequence.')
+        raise exc

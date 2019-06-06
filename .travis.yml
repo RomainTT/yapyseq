@@ -1,0 +1,21 @@
+language: python
+
+python:
+  - '3.6'
+  - '3.7-dev'
+
+install:
+  - pip install .
+
+script:
+  - pytest
+
+deploy:
+  provider: pypi
+  user: RomainTT
+  password:
+    secure: b6ZW0f7iEyaKAncRoFUiFb3EOhtITk4XrlNVpOy5tuZhV2oJXmqqeSTmUTrV3F464VT8Tlrr7ZcqdLo1fgaiOO438cDYDuHEZETW8lD+E0IEPNSXS0KuTS6ozNnwgKjfQ+Q1KkvPxd9Imha67sKvbBVrGdum688OFtbvRKFdnMBrUiRWjPLEiPjOuqknBBWMOPxTjuiKn1XvbYzCL4MbxOAoSkDXR3x3ogMddmZDNgZLsA6ySbjd8zNrFrQ2WrkasRXcXkLW+C8gSvegwVDnAlyPGZ3hX3FxBvSrPVduT0Is5JhQWewmqAAMXbbvVE1dKCvMi5+uVGpp+SscdphgT3DBWEhFl1QCGVziwKRSC56JDdHF6XHGNz3WHnnU7GkySAJyWo7xt5iX025MKAzu/jGGikFXY98GxHWAgWkGb5wr+Fkp2F/h2r5hvmWnMyg4NLq/vYGeeaK9p+XuUiBFK2KEurQa4MYM1w3NjuDntPI0OpYhHfyTh528CX6fBskU3AX0jAmQeoLiCjSxQCntoSXtnoUN4cShwifcqQnfEXSNftrk6BK6P270VA9G7ArV6fP6/S9NJUK9u5DEY8E+9Md3++0sc+KlDeyDWbf6KjuyVdVJb45KRQwfgniejKBSEV7B9ZYlsedhqWNtDFCRrZ/HaMrAtDFQE2a2MlTZriw=
+  on:
+    tags: true
+    branch: master
+  

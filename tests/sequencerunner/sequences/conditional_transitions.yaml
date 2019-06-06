@@ -28,9 +28,9 @@ sequence:
     timeout: 0.5
     transitions:
     - target: 3
-      condition: results[2].exception.is_raised
+      condition: results[2].exception is None
     - target: 4
-      condition: not results[2].exception.is_raised
+      condition: results[2].exception is not None
 
   - id: 3
     type: function

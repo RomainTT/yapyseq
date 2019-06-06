@@ -1,5 +1,8 @@
 # Yapyseq developer documentation
 
+TODO: catch and display internal errors of yapyseq inside sub-processes.
+	  Today, processes die and runner waits for the queue forever.
+
 ## Internal architecture
 
 Here are the main classes of yapyseq:
