@@ -33,6 +33,10 @@ class ReadOnlyError(ValueError):
     pass
 
 
+class TestSequenceFailed(RuntimeError):
+    __test__ = False  # for pytest ignorance
+    pass
+
 # ------------------------------------------------------------------------------
 # Custom types for this module
 # ------------------------------------------------------------------------------
@@ -70,6 +74,8 @@ class SequenceRunner(object):
 
     Attributes:
         status:
+
+    TODO: implement a logger for tests only, and a logger for function only.
     """
 
     # --------------------------------------------------------------------------
@@ -181,6 +187,9 @@ class SequenceRunner(object):
         self._logger.info(('Finished initialization of sequence {}'
                            ).format(self.basename))
 
+        # Initialize test result
+        self._test_result = True
+
 
     def _add_new_nodes(self, new_node_ids: Union[int, Set[int]],
                        previous_node_id: Union[int, None]) -> None:
@@ -223,7 +232,7 @@ class SequenceRunner(object):
         # ----------------------------------------------------------------------
         # If the node is a "start" node, just get the next node
         if isinstance(new_node, StartNode):
-            next_node_ids = new_node.get_next_node_id(self._variables)
+            next_node_ids = new_node.get_next_node_id(self._variables.copy())
             self._add_new_nodes(next_node_ids, None)
             self._logger.info(('Node {} engaged. Type is "start". '
                                'Next node is {}').format(new_node.nid,
@@ -239,7 +248,7 @@ class SequenceRunner(object):
         # ----------------------------------------------------------------------
         # If the node is a "parallel split", get all next nodes
         elif isinstance(new_node, ParallelSplitNode):
-            next_node_ids = new_node.get_next_node_id(self._variables)
+            next_node_ids = new_node.get_next_node_id(self._variables.copy())
             self._add_new_nodes(next_node_ids, new_node.nid)
             self._logger.info(('Node {} engaged. Type is "parallel split". '
                                'Next nodes are {}').format(new_node.nid,
@@ -262,7 +271,7 @@ class SequenceRunner(object):
             # Get the next node after the parallel_sync
             if new_node.is_sync_complete():
                 new_node.clear_history()
-                next_node_ids = new_node.get_next_node_id(self._variables)
+                next_node_ids = new_node.get_next_node_id(self._variables.copy())
                 self._add_new_nodes(next_node_ids, new_node.nid)
                 self._logger.info(('Node {} engaged. Type is "parallel sync". '
                                    'Synchronisation is completed. '
@@ -286,11 +295,11 @@ class SequenceRunner(object):
                                      "").format(new_node.nid, inter))
             # Evaluate expression for each variable
             for var_name, expr in var_dict.items():
-                value = evaluate_expr(expr, self._variables)
+                value = evaluate_expr(expr, self._variables.copy())
                 # Update the writeable sequence variable
                 self._variables[var_name] = value
             # Apply transition
-            next_node_ids = new_node.get_next_node_id(self._variables)
+            next_node_ids = new_node.get_next_node_id(self._variables.copy())
             self._add_new_nodes(next_node_ids, None)
             self._logger.info(('Node {} engaged. Type is "variable". '
                                'Next node is {}').format(new_node.nid,
@@ -344,11 +353,38 @@ class SequenceRunner(object):
 
         # Get the next node according to transitions
         # and add it to the set of new nodes
-        next_node_ids = node_object.get_next_node_id(self._variables)
+        next_node_ids = node_object.get_next_node_id(self._variables.copy())
         self._add_new_nodes(next_node_ids, new_result.nid)
 
-        self._logger.info(('Function node {} is terminated. Next node is '
-                           '{}.').format(new_result.nid, next_node_ids.pop()))
+        if isinstance(node_object, FunctionNode):
+            next_node_id = next_node_ids.pop()
+            self._logger.info(
+                ('Function node {} is terminated. Next node is '
+                 '{}.').format(new_result.nid, next_node_id)
+            )
+
+            # Manage the impact of a test result on the sequence.
+            # And log the reason of the failure if it failed.
+            if node_object.is_test:
+                if new_result.exception:
+                    # General test result of the sequence is failed
+                    self._test_result = False
+                    # Log the exception
+                    if new_result.exception.wrappers:
+                        exc = new_result.exception.wrappers
+                    else:
+                        exc = new_result.exception.function
+                    self._logger.error(
+                        ("Node {} was a test and it FAILED. "
+                         "Below is the exception that was raised").format(
+                             new_result.nid),
+                        exc_info=exc
+                    )
+                else:
+                    self._logger.info(
+                        ("Node {} was a test node and it PASSED.").format(
+                            new_result.nid)
+                    )
 
     # --------------------------------------------------------------------------
     # Public methods
@@ -386,7 +422,7 @@ class SequenceRunner(object):
                 self._logger.debug(('There are currently {} running '
                                     'nodes.').format(len(self._running_nodes)))
                 # A single queue is shared by all threads to provide function
-                # node results. To know when a function node is over the queue
+                # node results. To know when a function node is over, the queue
                 # is polled for a result.
                 # The queue provides objects of type FunctionNodeResult
                 new_result = self._result_queue.get()
@@ -395,6 +431,12 @@ class SequenceRunner(object):
 
         self.status = SeqRunnerStatus.STOPPED
         self._logger.info('END of the run of sequence {}'.format(self.basename))
+ 
+        # If the test result is failed, raise an exception
+        if not self._test_result:
+            self._logger.error("Some tests FAILED in the sequence. Read the log"
+                               " to know more.")
+            raise TestSequenceFailed()
 
     def pause(self):
         # TODO
@@ -415,4 +457,4 @@ class SequenceRunner(object):
     @property
     def variables(self) -> Dict:
         """Copy of the current sequence variables (read-only)."""
-        return dict(self._variables)
+        return self._variables.copy()

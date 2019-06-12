@@ -11,6 +11,7 @@ import click
 import pkg_resources
 
 from yapyseq import SequenceReader, SequenceFileError, SequenceRunner
+from yapyseq import TestSequenceFailed
 
 
 @click.group()
@@ -77,6 +78,9 @@ def run(sequence_file, function_dir, constant, no_log):
     runner = SequenceRunner(sequence_file, function_dir, logger=(not no_log))
     try:
         runner.run(blocking=True)
+    except TestSequenceFailed as exc:
+        # Return exit code 1 to indicate a test failure
+        exit(1)
     except Exception as exc:
         # Log the exceptions if they occur
         runner._logger.exception('An exception was raised during the run'

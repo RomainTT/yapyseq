@@ -495,7 +495,8 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
                  name: str = None,
                  timeout: int = None,
                  return_var_name: str = None,
-                 wrappers: OrderedDict = None):
+                 wrappers: OrderedDict = None,
+                 is_test: bool = False):
         """Initialize a FunctionNode.
 
         Args:
@@ -511,6 +512,8 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
             wrappers: (optional) an OrderedDict of wrappers around this node.
                 Keys are the names of wrapper classes, and values are arguments
                 for constructors of these classes.
+            is_test: (optional) True to declare this node as a test node. This
+                can have impacts on the sequence.
         """
         # Here I do NOT use super() because it becomes really hard to maintain
         # in case of inheritance diamond like here. Fore more information, read
@@ -521,6 +524,7 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
         self._function_kwargs = function_kwargs if function_kwargs else dict()
         self._timeout = timeout
         self._return_var_name = return_var_name
+        self._is_test = is_test
 
     @property
     def function_name(self) -> str:
@@ -547,6 +551,11 @@ class FunctionNode(SimpleTransitionalNode, WrappedNode):
                  "Get {}, expected {}").format(
                      func_callable.__name__, self._function_name))
         self._func_callable = func_callable
+
+    @property
+    def is_test(self) -> bool:
+        """True if this node is a test (read-only)."""
+        return self._is_test
 
     def _create_node_result(self, function_exception: Union[None, Exception],
                             wrappers_exception: Union[None, Exception],
@@ -728,6 +737,5 @@ class VariableNode(SimpleTransitionalNode):
     def variables(self):
         """Dictionary of variables with python expressions as values."""
         return self._variables
-
 
 # TODO: SequenceNode

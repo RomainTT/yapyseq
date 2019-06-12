@@ -197,6 +197,36 @@ instead of calling `results[1].returned`:
     return: spam
 ```
 
+##### Test
+
+A function node can be marked as a test thanks to the `is_test` attribute. If
+the function raises an exception, the test is considered as *failed*, else it 
+is considered as *passed*.
+Having some nodes marked as tests has the following effects:
+- If one of the nodes marked as tests in a sequence raised an exception (result is 
+  "failed") then:
+  - The `SequenceRunner` object raises the exception `TestSequenceFailed`
+  - The *cli command* returns the error code 1.
+- If a test failed, the content of the exception that caused the failure is written
+  in the logs.
+
+Example:
+
+```yaml
+    id: 1
+    type: function 
+    function: check_path_exists  # This func. raises an exc. if given path does not exist
+    arguments:
+      path: str('my_path')
+	is_test: True
+    transitions:
+      - target: 2
+        condition: results[1].exception is None  # Go to node 2 if the path exists 
+      - target: 3
+        condition: results[1].exception is not None  # Go to node 3 if the path does not exist
+```
+
+
 #### Variable node
 
 A variable node is used to create/update some sequence variables. Sequence

@@ -38,6 +38,7 @@ function_node:
   return: str(required=False)  # variable in which returned object must be stored
   transitions: list(include('transition'), required=True)  # transitions of this node
   wrappers: list(str(), map(), required=False)  # wrappers around this node
+  is_test: int(required=False)  # is this node a test node ?
 
 variable_node:
   type: enum('variable', required=True)

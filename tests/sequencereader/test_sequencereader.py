@@ -63,6 +63,13 @@ class TestSequenceReaderParsing(object):
         assert n.return_var_name == 'spam'
         assert n.get_all_next_node_ids() == {5}
         assert n.wrapper_names == {"WrapperSpam", "WrapperEgg"}
+        assert n.is_test == False
+
+        n = node_dict[3]
+        assert n.is_test == False
+
+        n = node_dict[4]
+        assert n.is_test == True
 
         n = node_dict[5]
         assert type(n) == ParallelSplitNode

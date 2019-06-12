@@ -21,3 +21,7 @@ def write_arg_in_file(arg: Any, file: str) -> None:
 
 def return_arg(arg: Any) -> any:
     return arg
+
+
+def raise_exception() -> None:
+    raise Exception

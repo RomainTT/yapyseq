@@ -135,3 +135,10 @@ class TestSequenceRunner(object):
         assert isinstance(runner.variables["results"][
                           1].exception.wrappers.cause,
                           RuntimeError)
+
+    def test_function_tests(self, func_dir, seq_dir):
+        """Check that is_test attribute is correctly managed."""
+        sequence = os.path.join(seq_dir, "test_nodes.yaml")
+        runner = SequenceRunner(sequence, func_dir, logger=False)
+        with pytest.raises(TestSequenceFailed):
+            runner.run()

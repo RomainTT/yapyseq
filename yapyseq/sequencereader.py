@@ -131,7 +131,8 @@ class SequenceReader(object):
                     function_kwargs=node_dict.get('arguments'),
                     timeout=node_dict.get('timeout'),
                     return_var_name=node_dict.get('return'),
-                    wrappers=wrapper_dict)
+                    wrappers=wrapper_dict,
+                    is_test=node_dict.get('is_test', False))
 
             elif ntype == "start":
                 new_node = StartNode(nid=node_dict.get('id'),

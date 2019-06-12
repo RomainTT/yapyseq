@@ -1,0 +1,23 @@
+sequence:
+  nodes:
+  - id: 0
+    type: start
+    transitions:
+    - target: 1
+
+  - id: 1
+    type: function
+    function: return_hello_world
+    is_test: True
+    transitions:
+    - target: 2
+
+  - id: 2
+    type: function
+    function: raise_exception
+    is_test: True
+    transitions:
+    - target: 3
+
+  - id: 3
+    type: stop
